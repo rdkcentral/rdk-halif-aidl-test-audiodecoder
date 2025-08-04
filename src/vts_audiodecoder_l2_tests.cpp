@@ -165,7 +165,10 @@ std::multimap<Property, int32_t> validIntProperties =
     {Property::AV_SOURCE, int32_t(static_cast<int32_t>(AVSource::IP))},
     {Property::AV_SOURCE, int32_t(static_cast<int32_t>(AVSource::TUNER))},
     {Property::AV_SOURCE, int32_t(static_cast<int32_t>(AVSource::SYSTEM))},
-    {Property::AV_SOURCE, int32_t(static_cast<int32_t>(AVSource::HDMI_1))},
+    {Property::AV_SOURCE, int32_t(static_cast<int32_t>(AVSource::HDMI_1))}
+};
+std::multimap<Property, int32_t> validAC4IntProperties =
+{
     {Property::AC4_PRESENTATION_GROUP_INDEX , -1},
     {Property::AC4_PRESENTATION_GROUP_INDEX , 0},
     {Property::AC4_ASSOCIATED_TYPE, -1},
@@ -186,7 +189,7 @@ std::multimap<Property, int32_t> validIntProperties =
     {Property::AC4_ASSOCIATED_AUDIO_MIXING_ENABLE, 1}
 };
 
-std::multimap<Property, android::String16> validStringProperties =
+std::multimap<Property, android::String16> validAC4StringProperties =
 {
     {Property::AC4_PREFERRED_LANG1, android::String16("")},
     {Property::AC4_PREFERRED_LANG1, android::String16("eng")},
@@ -246,26 +249,47 @@ UT_ADD_TEST(VTS_L2_AudioDecoder, SetandGetProperties)
 
                     UT_ASSERT_EQUAL(value, getValue);
                 }
-
-                /* Test String property values */
-                for (const auto& [property, value] : validStringProperties)
+                /*Check for AC4 Property only if the decoder support AC4 codec*/
+                if (Codec::DOLBY_AC4 == _codec)
                 {
-                    PropertyValue setPropertyValue;
-                    std::optional<PropertyValue> getPropertyValue;
+                    /* Test int property values */
+                    for (const auto &[property, value] : validAC4IntProperties)
+                    {
+                        PropertyValue setPropertyValue;
+                        std::optional<PropertyValue> getPropertyValue;
 
-                    setPropertyValue.value = PropertyValue::Value::make<PropertyValue::Value::Tag::stringValue>(value);
+                        setPropertyValue.value = PropertyValue::Value::make<PropertyValue::Value::Tag::intValue>(value);
 
-                    /* set the property */
-                    AUDIODECODER_SETPROPERTY_SUCCESS(audioDecoderController, property, setPropertyValue);
+                        /* set the property */
+                        AUDIODECODER_SETPROPERTY_SUCCESS(audioDecoderController, property, setPropertyValue);
 
-                    /* get the property */
-                    AUDIODECODER_GET_PROPERTY_SUCCESS(decoder, property, getPropertyValue);
+                        /* get the property */
+                        AUDIODECODER_GET_PROPERTY_SUCCESS(decoder, property, getPropertyValue);
 
-                    android::String16 getValue = getPropertyValue->value->get<PropertyValue::Value::Tag::stringValue>();
+                        int32_t getValue = getPropertyValue->value->get<PropertyValue::Value::Tag::intValue>();
 
-                    UT_ASSERT_EQUAL(value, getValue);
+                        UT_ASSERT_EQUAL(value, getValue);
+                    }
+
+                    /* Test String property values */
+                    for (const auto &[property, value] : validAC4StringProperties)
+                    {
+                        PropertyValue setPropertyValue;
+                        std::optional<PropertyValue> getPropertyValue;
+
+                        setPropertyValue.value = PropertyValue::Value::make<PropertyValue::Value::Tag::stringValue>(value);
+
+                        /* set the property */
+                        AUDIODECODER_SETPROPERTY_SUCCESS(audioDecoderController, property, setPropertyValue);
+
+                        /* get the property */
+                        AUDIODECODER_GET_PROPERTY_SUCCESS(decoder, property, getPropertyValue);
+
+                        android::String16 getValue = getPropertyValue->value->get<PropertyValue::Value::Tag::stringValue>();
+
+                        UT_ASSERT_EQUAL(value, getValue);
+                    }
                 }
-
                 /* Close the decoder */
                 AUDIODECODER_CLOSE_SUCCESS(decoder, audioDecoderController, true);
             }
@@ -338,24 +362,46 @@ UT_ADD_TEST(VTS_L2_AudioDecoder, SetandGetProperties_multipleInstance)
 
                 UT_ASSERT_EQUAL(value, getValue);
             }
-
-            /* Test String property values */
-            for (const auto& [property, value] : validStringProperties)
+            /*Check if decoder supports AC4 codec*/
+            if (std::find(capabilities->supportedCodecs.begin(), capabilities->supportedCodecs.end(),
+                          Codec::DOLBY_AC4) != capabilities->supportedCodecs.end())
             {
-                PropertyValue setPropertyValue;
-                std::optional<PropertyValue> getPropertyValue;
+                for (const auto &[property, value] : validAC4IntProperties)
+                {
+                    PropertyValue setPropertyValue;
+                    std::optional<PropertyValue> getPropertyValue;
 
-                setPropertyValue.value = PropertyValue::Value::make<PropertyValue::Value::Tag::stringValue>(value);
+                    setPropertyValue.value = PropertyValue::Value::make<PropertyValue::Value::Tag::intValue>(value);
 
-                /* set the property */
-                AUDIODECODER_SETPROPERTY_SUCCESS(audioDecoderController, property, setPropertyValue);
+                    /* set the property */
+                    AUDIODECODER_SETPROPERTY_SUCCESS(audioDecoderController, property, setPropertyValue);
 
-                /* get the property */
-                AUDIODECODER_GET_PROPERTY_SUCCESS(decoder, property, getPropertyValue);
+                    /* get the property */
+                    AUDIODECODER_GET_PROPERTY_SUCCESS(decoder, property, getPropertyValue);
 
-                android::String16 getValue = getPropertyValue->value->get<PropertyValue::Value::Tag::stringValue>();
+                    int32_t getValue = getPropertyValue->value->get<PropertyValue::Value::Tag::intValue>();
 
-                UT_ASSERT_EQUAL(value, getValue);
+                    UT_ASSERT_EQUAL(value, getValue);
+                }
+
+                /* Test String property values */
+                for (const auto &[property, value] : validAC4StringProperties)
+                {
+                    PropertyValue setPropertyValue;
+                    std::optional<PropertyValue> getPropertyValue;
+
+                    setPropertyValue.value = PropertyValue::Value::make<PropertyValue::Value::Tag::stringValue>(value);
+
+                    /* set the property */
+                    AUDIODECODER_SETPROPERTY_SUCCESS(audioDecoderController, property, setPropertyValue);
+
+                    /* get the property */
+                    AUDIODECODER_GET_PROPERTY_SUCCESS(decoder, property, getPropertyValue);
+
+                    android::String16 getValue = getPropertyValue->value->get<PropertyValue::Value::Tag::stringValue>();
+
+                    UT_ASSERT_EQUAL(value, getValue);
+                }
             }
         }
 

@@ -692,7 +692,7 @@ extern sp<IAudioDecoderManager> gAudioDecoderManager;
 /* Stream metadata */
 struct AudioMetatData
 {
-    Codec sourceCodec;
+    com::rdk::hal::audiodecoder::Codec sourceCodec;
     bool isDolbyAtmos;
     int32_t numChannels;
     int32_t sampleRate;
@@ -729,7 +729,7 @@ typedef struct InputAudioFrame
 /* Error frame details */
 typedef struct ErrorDetails
 {
-    ErrorCode vendorErrorCode;
+    com::rdk::hal::audiodecoder::ErrorCode vendorErrorCode;
     int32_t errorCode;
     chrono::steady_clock::time_point receiveTime;
 }ErrorDetails_t;
@@ -743,7 +743,12 @@ public:
 
     string formatChannelVector(const std::vector<ChannelType>& channels);
 
-    Status onFrameOutput(int64_t nsPresentationTime, int64_t frameBufferHandle, const ::optional<FrameMetadata>& metadata) override;
+    ::android::binder::Status onFrameOutput(
+        int64_t nsPresentationTime,
+        int64_t frameBufferHandle,
+        const std::optional<com::rdk::hal::audiodecoder::FrameMetadata>& metadata
+    ) override;
+
 
     bool getNextFrame(DecodedAudioFrame_t &frameInfo, int32_t waitTime, bool popFrame);
 
@@ -773,7 +778,7 @@ public:
     }
     virtual ~AudioDecoderEventListener() = default;
 
-    Status onDecodeError(ErrorCode vendorErrorCode, int32_t errorCode) override;
+    ::android::binder::Status onDecodeError(::com::rdk::hal::audiodecoder::ErrorCode errorCode, int32_t vendorErrorCode) override;
 
     Status onStateChanged(State oldState,State newState) override;
 

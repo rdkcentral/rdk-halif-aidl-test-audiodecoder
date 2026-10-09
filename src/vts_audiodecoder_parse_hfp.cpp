@@ -131,12 +131,6 @@ UT_status_t vts_audiodecoder_parseAudioDecoderHFP()
     return UT_STATUS_OK;
 }
 
-bool isTunnelModeSupported()
-{
-    //TODO: Implement the actual check for tunnel mode support based on interface decisions
-    return false;
-}
-
 bool isSecureModeSupported()
 {
     for (const auto& decoder : gAudiodecoders_hfp)

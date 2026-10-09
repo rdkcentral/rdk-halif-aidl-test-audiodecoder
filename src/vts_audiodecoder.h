@@ -76,6 +76,7 @@
 #include <deque>
 #include <queue>
 #include <condition_variable>
+#include <atomic>
 #include <memory>
 #include <tuple>
 #include <fstream>
@@ -799,6 +800,13 @@ typedef struct DecodedAudioFrame
     chrono::steady_clock::time_point receiveTime;
 }DecodedAudioFrame_t;
 
+enum class FrameOutputMode
+{
+    UNKNOWN,
+    TUNNEL,
+    NON_TUNNEL
+};
+
 /* Input frame to decoder */
 typedef struct InputAudioFrame
 {
@@ -842,6 +850,7 @@ public:
 
     bool getNextFrame(DecodedAudioFrame_t &frameInfo, int32_t waitTime, bool popFrame);
     void resetFrames();
+    FrameOutputMode getFrameOutputMode() const { return mFrameOutputMode.load(); }
 
     /* Returns true if onDecodeBufferAvailable fired within waitTimeMs, false on timeout */
     bool waitForDecodeBufferAvailable(int32_t waitTimeMs);
@@ -861,6 +870,7 @@ private:
     queue<DecodedAudioFrame_t> mFrameQueue;
     mutex mQueueMutex;
     condition_variable mFrameAvailable;
+    atomic<FrameOutputMode> mFrameOutputMode{FrameOutputMode::UNKNOWN};
     atomic<bool> mShutdownFlag;
     int32_t mDecoderID = -1;
 

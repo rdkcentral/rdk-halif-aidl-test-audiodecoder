@@ -84,7 +84,6 @@ extern std::vector<audioDecoder> gAudiodecoders_hfp;
 #define AUDIODECODERMGR_IAUDIODECODER     "audiodecoder.IAudioDecoder"
 
 UT_status_t vts_audiodecoder_parseAudioDecoderHFP();
-bool isTunnelModeSupported();
 bool isSecureModeSupported();
 void vts_audiodecoder_get_available_id(std::vector<int32_t> &availableIds);
 

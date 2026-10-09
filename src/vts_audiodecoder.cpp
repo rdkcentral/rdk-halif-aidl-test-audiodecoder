@@ -106,11 +106,8 @@ Status AudioDecoderControllerListener::onFrameOutput(int64_t nsPresentationTime,
     frame.receiveTime = chrono::steady_clock::now();
     frame.framePTS = nsPresentationTime;
 
-    frame.isTunnel = false;
-    if (frameAVBufferHandle == -1)
-    {
-        frame.isTunnel = true;
-    }
+    frame.isTunnel = frameAVBufferHandle == -1;
+    mFrameOutputMode = frame.isTunnel ? FrameOutputMode::TUNNEL : FrameOutputMode::NON_TUNNEL;
     frame.frameBufferHandle = frameAVBufferHandle;
     frame.isMetaAvailable = false;
     if (metadata.has_value())
@@ -209,6 +206,7 @@ void AudioDecoderControllerListener::resetFrames()
     {
         mFrameQueue.pop();
     }
+    mFrameOutputMode = FrameOutputMode::UNKNOWN;
 }
 
 /**

@@ -261,6 +261,7 @@ Status AudioDecoderControllerListener::onEndOfStream()
         mEndOfStreamFlag = true;
     }
     mEndOfStreamCV.notify_one();
+    mFrameAvailable.notify_all();
     return Status::ok();
 }
 
@@ -445,12 +446,6 @@ bool AudioDecoderEventListener::checkStateTransistion(AudioDecoderState expOldSt
     return foundClosedToOpening;
 }
 
-/**
- * Clears the error queue
- *
- * @param None.
- * @return None
- */
 void AudioDecoderEventListener::resetErrors()
 {
     lock_guard<mutex> lock(mErrorMutex);

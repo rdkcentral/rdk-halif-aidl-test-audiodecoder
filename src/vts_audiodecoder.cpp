@@ -106,11 +106,8 @@ Status AudioDecoderControllerListener::onFrameOutput(int64_t nsPresentationTime,
     frame.receiveTime = chrono::steady_clock::now();
     frame.framePTS = nsPresentationTime;
 
-    frame.isTunnel = false;
-    if (frameAVBufferHandle == -1)
-    {
-        frame.isTunnel = true;
-    }
+    frame.isTunnel = frameAVBufferHandle == -1;
+    mFrameOutputMode = frame.isTunnel ? FrameOutputMode::TUNNEL : FrameOutputMode::NON_TUNNEL;
     frame.frameBufferHandle = frameAVBufferHandle;
     frame.isMetaAvailable = false;
     if (metadata.has_value())
@@ -209,6 +206,7 @@ void AudioDecoderControllerListener::resetFrames()
     {
         mFrameQueue.pop();
     }
+    mFrameOutputMode = FrameOutputMode::UNKNOWN;
 }
 
 /**
@@ -263,6 +261,7 @@ Status AudioDecoderControllerListener::onEndOfStream()
         mEndOfStreamFlag = true;
     }
     mEndOfStreamCV.notify_one();
+    mFrameAvailable.notify_all();
     return Status::ok();
 }
 
@@ -447,12 +446,6 @@ bool AudioDecoderEventListener::checkStateTransistion(AudioDecoderState expOldSt
     return foundClosedToOpening;
 }
 
-/**
- * Clears the error queue
- *
- * @param None.
- * @return None
- */
 void AudioDecoderEventListener::resetErrors()
 {
     lock_guard<mutex> lock(mErrorMutex);

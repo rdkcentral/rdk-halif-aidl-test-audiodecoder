@@ -162,6 +162,24 @@ public:
         return true;
     }
 
+    bool frameOutputMatchesTunnelMode(bool tunnelMode) const
+    {
+        bool outputObserved = false;
+        for (const auto& decoderEntry : mAudioDecoderList)
+        {
+            const auto outputMode = std::get<2>(decoderEntry)->getFrameOutputMode();
+            if (outputMode != FrameOutputMode::UNKNOWN)
+            {
+                outputObserved = true;
+                if ((outputMode == FrameOutputMode::TUNNEL) != tunnelMode)
+                {
+                    return false;
+                }
+            }
+        }
+        return outputObserved;
+    }
+
     void runSequentialDecode(testConfiguration_t& testConfig, bool secureDecode)
     {
         for (const auto& [_decoderId, decoderHandle, controlListener, eventListener, capabilities] : mAudioDecoderList)
@@ -258,13 +276,6 @@ public:
 
     void runSingleProcessTest(const char *testName, bool secureMode, bool tunnelMode, bool concurrentMode)
     {
-        if (tunnelMode && !isTunnelModeSupported())
-        {
-            UT_LOG_INFO("Skipping test '%s': Tunnel mode is not supported", testName);
-            GTEST_SKIP() << "Tunnel mode is not supported";
-            return;
-        }
-
         if (secureMode && !isSecureModeSupported())
         {
             UT_LOG_INFO("Skipping test '%s': Secure mode is not supported", testName);
@@ -289,6 +300,14 @@ public:
             {
                 runSequentialDecode(test, secureMode);
             }
+        }
+
+        if (!frameOutputMatchesTunnelMode(tunnelMode))
+        {
+            const char* requestedMode = tunnelMode ? "tunnelled" : "non-tunnelled";
+            UT_LOG_INFO("Skipping test '%s': observed frame output does not match requested %s mode",
+                        testName, requestedMode);
+            GTEST_SKIP() << "Requested audio decoder output mode is not supported";
         }
     }
 

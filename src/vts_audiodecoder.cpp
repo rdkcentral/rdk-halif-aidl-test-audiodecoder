@@ -481,12 +481,23 @@ int32_t AudioDecoderEventListener::mUsedDecoderID = -1;
 
 void AudioDecoderTest::run(bool validateMetrics)
 {
+    runInternal(validateMetrics, std::nullopt);
+}
+
+void AudioDecoderTest::runForOutputMode(bool validateMetrics, bool expectedTunnelMode)
+{
+    runInternal(validateMetrics, expectedTunnelMode);
+}
+
+void AudioDecoderTest::runInternal(bool validateMetrics, std::optional<bool> expectedTunnelMode)
+{
     if (!mAVbufferHelper)
     {
         UT_ASSERT_TRUE(false) << "AVBufferHelper is not initialized";
         return;
     }
 
+    mExpectedTunnelMode = expectedTunnelMode;
     setupAudioDecoder();
     if (!mSetupSucceeded)
     {
@@ -505,6 +516,15 @@ void AudioDecoderTest::run(bool validateMetrics)
 
     if (validateThread.joinable())
         validateThread.join();
+
+    const FrameOutputMode observedMode = mControlListener->getFrameOutputMode();
+    if (mExpectedTunnelMode.has_value() &&
+        observedMode != FrameOutputMode::UNKNOWN &&
+        ((observedMode == FrameOutputMode::TUNNEL) != mExpectedTunnelMode.value()))
+    {
+        teardownDecoder();
+        return;
+    }
 
     /* onDecodeBufferAvailable and queue-full compliance check (all tests).
      *
@@ -1105,6 +1125,7 @@ void AudioDecoderTest::validatePostLoopMetrics(const FrameValidationState& state
 void AudioDecoderTest::validateDecodedFrame()
 {
     DecodedAudioFrame_t decodedFrame;
+    bool outputModeMismatch = false;
 
     FrameValidationState state;
     state.decodeErrors = static_cast<int32_t>(count_if(
@@ -1119,6 +1140,23 @@ void AudioDecoderTest::validateDecodedFrame()
 
     while (mControlListener->getNextFrame(decodedFrame, MAX_FRAME_WAIT_TIME, true))
     {
+        if (mExpectedTunnelMode.has_value() &&
+            decodedFrame.isTunnel != mExpectedTunnelMode.value())
+        {
+            outputModeMismatch = true;
+
+            if (decodedFrame.frameBufferHandle != -1)
+            {
+                bool isBufferValid = false;
+                AVBUFFER_ISVALID_SUCCESS(mAVBufferManager, decodedFrame.frameBufferHandle, isBufferValid);
+                if (isBufferValid)
+                {
+                    AVBUFFER_FREE_SUCCESS(mAVBufferManager, decodedFrame.frameBufferHandle);
+                }
+            }
+            continue;
+        }
+
         /* Block 1: frame data — only when buffer is valid */
         if (decodedFrame.frameBufferHandle != -1)
         {
@@ -1161,7 +1199,10 @@ void AudioDecoderTest::validateDecodedFrame()
         }
     }
 
-    validatePostLoopMetrics(state);
+    if (!outputModeMismatch)
+    {
+        validatePostLoopMetrics(state);
+    }
 }
 
 /** @} */ // End of AUDIO_DECODER_HALTEST_HEADER

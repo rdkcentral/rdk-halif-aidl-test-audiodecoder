@@ -953,6 +953,7 @@ public:
     ~AudioDecoderTest();
 
     void run(bool validateMetrics);
+    void runForOutputMode(bool validateMetrics, bool expectedTunnelMode);
 
     void getDecoderMetrics(int32_t &framesDecoded, int32_t &decodeErrors, int32_t &framesDropped);
 
@@ -976,6 +977,7 @@ private:
     int32_t mDecodeQueueFullCount = 0;
     bool    mEosSubmitted         = false;
     bool    mSubmittedInSession   = false;
+    std::optional<bool> mExpectedTunnelMode;
     // Set false if setupAudioDecoder() bails out before opening the decoder
     // (e.g. input file missing) — run() checks this to skip startDecoding()/
     // teardownDecoder() rather than using a null mAudioDecoderController.
@@ -998,6 +1000,7 @@ private:
     };
 
     void setupAudioDecoder();
+    void runInternal(bool validateMetrics, std::optional<bool> expectedTunnelMode);
     void startDecoding();
     void teardownDecoder();
     void validateDecodedFrame();

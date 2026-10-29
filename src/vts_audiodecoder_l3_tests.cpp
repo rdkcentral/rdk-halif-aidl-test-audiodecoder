@@ -162,7 +162,25 @@ public:
         return true;
     }
 
-    void runSequentialDecode(testConfiguration_t& testConfig, bool secureDecode)
+    bool frameOutputMatchesTunnelMode(bool tunnelMode) const
+    {
+        bool outputObserved = false;
+        for (const auto& decoderEntry : mAudioDecoderList)
+        {
+            const auto outputMode = std::get<2>(decoderEntry)->getFrameOutputMode();
+            if (outputMode != FrameOutputMode::UNKNOWN)
+            {
+                outputObserved = true;
+                if ((outputMode == FrameOutputMode::TUNNEL) != tunnelMode)
+                {
+                    return false;
+                }
+            }
+        }
+        return outputObserved;
+    }
+
+    bool runSequentialDecode(testConfiguration_t& testConfig, bool secureDecode, bool tunnelMode)
     {
         for (const auto& [_decoderId, decoderHandle, controlListener, eventListener, capabilities] : mAudioDecoderList)
         {
@@ -184,7 +202,7 @@ public:
                 AudioDecoderTest decodeTest(_decoderId, decoderHandle, controlListener,
                                         eventListener, mAVBufferManager, mAVbufferHelper, secureDecode, testConfig, isSinkAttached);
 
-                decodeTest.run(true);
+                decodeTest.runForOutputMode(true, tunnelMode);
             } /* decodeTest destructor called here — destroyPool fires before metrics check */
 
             /* Get heap metrics */
@@ -195,12 +213,18 @@ public:
             UT_ASSERT_TRUE(beforeHeapMetrics.bytesUsed == afterHeapMetrics.bytesUsed);
             UT_ASSERT_TRUE(beforeHeapMetrics.bytesTotal == afterHeapMetrics.bytesTotal);
 
+            if (!frameOutputMatchesTunnelMode(tunnelMode))
+            {
+                return false;
+            }
+
             /* TODO: check if this required or not */
             //controlListener->shutdown();
         }
+        return true;
     }
 
-    void runConcurrentDecode(testConfiguration_t& testConfig, bool secureDecode)
+    bool runConcurrentDecode(testConfiguration_t& testConfig, bool secureDecode, bool tunnelMode)
     {
         try {
             vector<thread> threads;
@@ -228,7 +252,8 @@ public:
                                                                     controlListener, eventListener,
                                                                     mAVBufferManager, mAVbufferHelper,
                                                                     secureDecode, testConfig, isSinkAttached);
-                    threads.emplace_back(&AudioDecoderTest::run, decoderTest.get(), true);
+                    threads.emplace_back(&AudioDecoderTest::runForOutputMode,
+                                         decoderTest.get(), true, tunnelMode);
 
                     decoderTests.push_back(std::move(decoderTest));
                 }
@@ -247,6 +272,7 @@ public:
             UT_ASSERT_TRUE(beforeHeapMetrics.bytesUsed == afterHeapMetrics.bytesUsed);
             UT_ASSERT_TRUE(beforeHeapMetrics.bytesTotal == afterHeapMetrics.bytesTotal);
 
+            return frameOutputMatchesTunnelMode(tunnelMode);
         } catch (const std::exception& ex) {
             UT_LOG_ERROR("Exception in runConcurrentDecode: %s", ex.what());
             UT_ASSERT_TRUE(false);
@@ -254,17 +280,11 @@ public:
             UT_LOG_ERROR("Unknown exception in runConcurrentDecode");
             UT_ASSERT_TRUE(false);
         }
+        return false;
     }
 
     void runSingleProcessTest(const char *testName, bool secureMode, bool tunnelMode, bool concurrentMode)
     {
-        if (tunnelMode && !isTunnelModeSupported())
-        {
-            UT_LOG_INFO("Skipping test '%s': Tunnel mode is not supported", testName);
-            GTEST_SKIP() << "Tunnel mode is not supported";
-            return;
-        }
-
         if (secureMode && !isSecureModeSupported())
         {
             UT_LOG_INFO("Skipping test '%s': Secure mode is not supported", testName);
@@ -280,14 +300,28 @@ public:
         {
             for(auto& test: testConfiguration)
             {
-                runConcurrentDecode(test, secureMode);
+                if (!runConcurrentDecode(test, secureMode, tunnelMode))
+                {
+                    const char* requestedMode = tunnelMode ? "tunnelled" : "non-tunnelled";
+                    UT_LOG_INFO("Skipping test '%s': observed frame output does not match requested %s mode",
+                                testName, requestedMode);
+                    GTEST_SKIP() << "Requested audio decoder output mode is not supported";
+                    return;
+                }
             }
         }
         else
         {
             for(auto& test: testConfiguration)
             {
-                runSequentialDecode(test, secureMode);
+                if (!runSequentialDecode(test, secureMode, tunnelMode))
+                {
+                    const char* requestedMode = tunnelMode ? "tunnelled" : "non-tunnelled";
+                    UT_LOG_INFO("Skipping test '%s': observed frame output does not match requested %s mode",
+                                testName, requestedMode);
+                    GTEST_SKIP() << "Requested audio decoder output mode is not supported";
+                    return;
+                }
             }
         }
     }

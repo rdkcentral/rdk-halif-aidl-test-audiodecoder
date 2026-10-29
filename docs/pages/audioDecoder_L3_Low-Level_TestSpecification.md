@@ -216,9 +216,9 @@ The class overrides `SetUp()` and `TearDown()` from `ut_core` to handle initiali
 |-|--------|---------|-----------|-------|
 |1|Setup|None|Initializes the test by acquiring service handles, supported decoder IDs, decoder capabilities, and registering event listeners|`getAudioDecoderIds()`<br>`getAudioDecoder()`<br>`registerEventListener()`<br>`getCapabilities()`|
 |2|TearDown|None|Cleans up by unregistering event listeners|`unregisterEventListener()`|
-|3|runSequentialDecode|vector\<testConfiguration_t\>& configuration<br>bool secureDecode|Decodes streams using all decoders sequentially using `DecoderTest` Class|`getHeapMetrics()`|
-|4|runConcurrentDecode|vector\<testConfiguration_t\>& configuration<br>bool secureDecode|Launches multiple threads to decode streams concurrently using `DecoderTest` Class|`getHeapMetrics()`|
-|5|runSingleProcessTest|char *testName<br>bool secureMode<br>bool concurrentMode|If `concurrentMode` is enabled, this function invokes `runConcurrentDecode`; otherwise, it calls `runSequentialDecode`||
+|3|runSequentialDecode|testConfiguration_t& configuration<br>bool secureDecode<br>bool tunnelMode|Decodes a stream using supported decoders sequentially. If the first observed output handle indicates a different tunnel mode than requested, mode-specific validation is suppressed and the caller skips the test without running the remaining streams.|`getHeapMetrics()`|
+|4|runConcurrentDecode|testConfiguration_t& configuration<br>bool secureDecode<br>bool tunnelMode|Launches decoder threads for one stream configuration. If the observed output handles indicate a different tunnel mode than requested, mode-specific validation is suppressed and the caller skips the test without running the remaining streams.|`getHeapMetrics()`|
+|5|runSingleProcessTest|char *testName<br>bool secureMode<br>bool tunnelMode<br>bool concurrentMode|Invokes `runConcurrentDecode` or `runSequentialDecode`. After the first usable stream reveals the platform output mode, it immediately skips an unsupported requested mode instead of executing every configured stream.||
 
 #### Setup
 
@@ -578,4 +578,3 @@ The L3 tests validate the functional correctness and performance of the AudioDec
 |62| ADecode_Concurrent_Tunnel_Secure_Flush             | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams<br>Controls.flush_pts       |
 |63| ADecode_Concurrent_Tunnel_Secure_FlushReset        | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams<br>Controls.flush_reset_pts |
 |64| ADecode_Concurrent_Tunnel_Secure_StopStart         | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams<br>Controls.stop_start_pts  |
-

@@ -76,6 +76,7 @@
 #include <deque>
 #include <queue>
 #include <condition_variable>
+#include <atomic>
 #include <memory>
 #include <tuple>
 #include <fstream>
@@ -799,6 +800,13 @@ typedef struct DecodedAudioFrame
     chrono::steady_clock::time_point receiveTime;
 }DecodedAudioFrame_t;
 
+enum class FrameOutputMode
+{
+    UNKNOWN,
+    TUNNEL,
+    NON_TUNNEL
+};
+
 /* Input frame to decoder */
 typedef struct InputAudioFrame
 {
@@ -842,6 +850,7 @@ public:
 
     bool getNextFrame(DecodedAudioFrame_t &frameInfo, int32_t waitTime, bool popFrame);
     void resetFrames();
+    FrameOutputMode getFrameOutputMode() const { return mFrameOutputMode.load(); }
 
     /* Returns true if onDecodeBufferAvailable fired within waitTimeMs, false on timeout */
     bool waitForDecodeBufferAvailable(int32_t waitTimeMs);
@@ -861,6 +870,7 @@ private:
     queue<DecodedAudioFrame_t> mFrameQueue;
     mutex mQueueMutex;
     condition_variable mFrameAvailable;
+    atomic<FrameOutputMode> mFrameOutputMode{FrameOutputMode::UNKNOWN};
     atomic<bool> mShutdownFlag;
     int32_t mDecoderID = -1;
 
@@ -943,6 +953,7 @@ public:
     ~AudioDecoderTest();
 
     void run(bool validateMetrics);
+    void runForOutputMode(bool validateMetrics, bool expectedTunnelMode);
 
     void getDecoderMetrics(int32_t &framesDecoded, int32_t &decodeErrors, int32_t &framesDropped);
 
@@ -966,6 +977,7 @@ private:
     int32_t mDecodeQueueFullCount = 0;
     bool    mEosSubmitted         = false;
     bool    mSubmittedInSession   = false;
+    std::optional<bool> mExpectedTunnelMode;
     // Set false if setupAudioDecoder() bails out before opening the decoder
     // (e.g. input file missing) — run() checks this to skip startDecoding()/
     // teardownDecoder() rather than using a null mAudioDecoderController.
@@ -988,6 +1000,7 @@ private:
     };
 
     void setupAudioDecoder();
+    void runInternal(bool validateMetrics, std::optional<bool> expectedTunnelMode);
     void startDecoding();
     void teardownDecoder();
     void validateDecodedFrame();

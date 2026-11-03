@@ -1886,14 +1886,14 @@ std::multimap<Property, int32_t> validAC4IntPropertyAll =
     {Property::AC4_ASSOCIATED_AUDIO_MIXING_ENABLE, 1}
 };
 
-std::multimap<Property, android::String16> validAC4StringPropertyAll =
+std::multimap<Property, std::string> validAC4StringPropertyAll =
 {
-    {Property::AC4_PREFERRED_LANG1, android::String16("")},
-    {Property::AC4_PREFERRED_LANG1, android::String16("eng")},
-    {Property::AC4_PREFERRED_LANG1, android::String16("fra")},
-    {Property::AC4_PREFERRED_LANG2, android::String16("")},
-    {Property::AC4_PREFERRED_LANG2, android::String16("eng")},
-    {Property::AC4_PREFERRED_LANG2, android::String16("fra")}
+    {Property::AC4_PREFERRED_LANG1, std::string("")},
+    {Property::AC4_PREFERRED_LANG1, std::string("eng")},
+    {Property::AC4_PREFERRED_LANG1, std::string("fra")},
+    {Property::AC4_PREFERRED_LANG2, std::string("")},
+    {Property::AC4_PREFERRED_LANG2, std::string("eng")},
+    {Property::AC4_PREFERRED_LANG2, std::string("fra")}
 };
 
 std::multimap<Property, int32_t> invalidIntPropertyReady =
@@ -1927,14 +1927,14 @@ std::multimap<Property, int32_t> invalidAC4IntPropertyAll =
     {Property::AC4_ASSOCIATED_AUDIO_MIXING_ENABLE, 2}
 };
 
-std::multimap<Property, android::String16> invalidAC4StringPropertyAll =
+std::multimap<Property, std::string> invalidAC4StringPropertyAll =
 {
-    {Property::AC4_PREFERRED_LANG1, android::String16("en£")},
-    {Property::AC4_PREFERRED_LANG1, android::String16("111")},
-    {Property::AC4_PREFERRED_LANG1, android::String16("a11")},
-    {Property::AC4_PREFERRED_LANG2, android::String16("en&")},
-    {Property::AC4_PREFERRED_LANG2, android::String16("111")},
-    {Property::AC4_PREFERRED_LANG2, android::String16("a11")}
+    {Property::AC4_PREFERRED_LANG1, std::string("en£")},
+    {Property::AC4_PREFERRED_LANG1, std::string("111")},
+    {Property::AC4_PREFERRED_LANG1, std::string("a11")},
+    {Property::AC4_PREFERRED_LANG2, std::string("en&")},
+    {Property::AC4_PREFERRED_LANG2, std::string("111")},
+    {Property::AC4_PREFERRED_LANG2, std::string("a11")}
 };
 
 /**
@@ -2317,9 +2317,8 @@ UT_ADD_TEST(VTS_L1_AudioDecoder, setAudioFormat_neg)
 * |03|decodeBufferWithMetadata before start|state=READY|status not ok, EX_ILLEGAL_STATE|Should pass|
 * |04|Start the decoder|None|state STARTED|Should pass|
 * |05|Invalid bufferHandle|bufferHandle=-1|status not ok, EX_ILLEGAL_ARGUMENT|Should pass|
-* |06|discontinuity=true (reserved in v1)|metadata.discontinuity=true|status not ok, EX_ILLEGAL_ARGUMENT|Should pass|
-* |07|Stop the decoder|None|state READY|Should pass|
-* |08|decodeBufferWithMetadata after stop|state=READY|status not ok, EX_ILLEGAL_STATE|Should pass|
+* |06|Stop the decoder|None|state READY|Should pass|
+* |07|decodeBufferWithMetadata after stop|state=READY|status not ok, EX_ILLEGAL_STATE|Should pass|
 * |09|Close the decoder|None|state CLOSED|Should pass|
 */
 UT_ADD_TEST(VTS_L1_AudioDecoder, decodeBufferWithMetadata_neg)
@@ -2347,7 +2346,6 @@ UT_ADD_TEST(VTS_L1_AudioDecoder, decodeBufferWithMetadata_neg)
             AUDIODECODER_OPEN_SUCCESS(audioDecoder, _codec, capabilities.supportsSecure, controllerListener, audioDecoderController, true);
 
             audiodecoder::InputBufferMetadata metadata;
-            metadata.discontinuity      = false;
             metadata.nsPresentationTime = 1000000;
             metadata.trimStartNs        = 0;
             metadata.trimEndNs          = 0;
@@ -2359,11 +2357,6 @@ UT_ADD_TEST(VTS_L1_AudioDecoder, decodeBufferWithMetadata_neg)
 
             /* invalid bufferHandle — EX_ILLEGAL_ARGUMENT (spec-mandated) */
             AUDIODECODER_DECODE_WITH_METADATA_FAILURE(audioDecoderController, invalid_bufferHandle, metadata, Status::EX_ILLEGAL_ARGUMENT);
-
-            /* discontinuity=true is reserved in v1 — EX_ILLEGAL_ARGUMENT (spec-mandated) */
-            metadata.discontinuity = true;
-            AUDIODECODER_DECODE_WITH_METADATA_FAILURE(audioDecoderController, valid_bufferHandle, metadata, Status::EX_ILLEGAL_ARGUMENT);
-            metadata.discontinuity = false;
 
             AUDIODECODER_STOP_SUCCESS(audioDecoder, audioDecoderController, true);
 

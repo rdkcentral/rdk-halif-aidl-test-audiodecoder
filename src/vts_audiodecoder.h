@@ -251,7 +251,7 @@ extern sp<IAudioDecoderManager> gAudioDecoderManager;
                     break; \
                 case PropertyValue::Value::Tag::stringValue: \
                     UT_LOG_INFO("Result getProperty(IN:property[%s], OUT:propertyValue[%s]), status:[isOK:%s, exception:%s]", audiodecoder::toString(property).c_str(), \
-                    propertyValue->value->get<PropertyValue::Value::Tag::stringValue>().string(), \
+                    propertyValue->value->get<PropertyValue::Value::Tag::stringValue>().c_str(), \
                     UT_Control_GetMapString(bool_mapTable, status.isOk()), \
                     UT_Control_GetMapString(statusException_mapTable, status.exceptionCode())); \
                     break; \
@@ -520,10 +520,9 @@ extern sp<IAudioDecoderManager> gAudioDecoderManager;
     do { \
         ::android::binder::Status status; \
         bool _aidl_return; \
-        UT_LOG_INFO("[DecoderID: %d] Calling decodeBufferWithMetadata(IN:bufferHandle[0x%016" PRIx64 "], IN:PTS[%" PRId64"], IN:trimStartNs[%d], IN:trimEndNs[%d], IN:discontinuity[%s])", \
+        UT_LOG_INFO("[DecoderID: %d] Calling decodeBufferWithMetadata(IN:bufferHandle[0x%016" PRIx64 "], IN:PTS[%" PRId64"], IN:trimStartNs[%d], IN:trimEndNs[%d])", \
             decoderID, (uint64_t)(bufferHandle), (int64_t)(metadata).nsPresentationTime, \
-            (metadata).trimStartNs, (metadata).trimEndNs, \
-            UT_Control_GetMapString(bool_mapTable, (metadata).discontinuity)); \
+            (metadata).trimStartNs, (metadata).trimEndNs); \
         status = (audioDecoderController)->decodeBufferWithMetadata(bufferHandle, metadata, &_aidl_return); \
         UT_LOG_INFO("[DecoderID: %d] Result decodeBufferWithMetadata(OUT:_aidl_return[%s]), status:[isOK:%s, exception:%s]", \
             decoderID, UT_Control_GetMapString(bool_mapTable, _aidl_return), \
@@ -540,10 +539,9 @@ extern sp<IAudioDecoderManager> gAudioDecoderManager;
     do { \
         ::android::binder::Status status; \
         bool _aidl_return = false; \
-        UT_LOG_INFO("Calling decodeBufferWithMetadata(IN:bufferHandle[0x%016" PRIx64 "], IN:PTS[%" PRId64 "], IN:trimStartNs[%d], IN:trimEndNs[%d], IN:discontinuity[%s])", \
+        UT_LOG_INFO("Calling decodeBufferWithMetadata(IN:bufferHandle[0x%016" PRIx64 "], IN:PTS[%" PRId64 "], IN:trimStartNs[%d], IN:trimEndNs[%d])", \
             (uint64_t)(bufferHandle), (int64_t)(metadata).nsPresentationTime, \
-            (metadata).trimStartNs, (metadata).trimEndNs, \
-            UT_Control_GetMapString(bool_mapTable, (metadata).discontinuity)); \
+            (metadata).trimStartNs, (metadata).trimEndNs); \
         status = (audioDecoderController)->decodeBufferWithMetadata(bufferHandle, metadata, &_aidl_return); \
         UT_LOG_INFO("Result decodeBufferWithMetadata(OUT:_aidl_return[%s]), status:[isOK:%s, exception:%s]", \
             UT_Control_GetMapString(bool_mapTable, _aidl_return), \

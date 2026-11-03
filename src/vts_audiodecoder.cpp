@@ -754,7 +754,6 @@ audiodecoder::InputBufferMetadata AudioDecoderTest::buildMetadata(size_t frameIn
     bool isLastFrame  = (frameIndex == mTestConfiguration.frameDetails.size() - 1);
     metadata.trimStartNs = isFirstFrame ? mTestConfiguration.trimStartNs : 0;
     metadata.trimEndNs   = isLastFrame  ? mTestConfiguration.trimEndNs   : 0;
-    metadata.discontinuity = false;
     return metadata;
 }
 
@@ -812,7 +811,6 @@ void AudioDecoderTest::handleMidStreamEOS(int64_t framePTS)
 
     audiodecoder::InputBufferMetadata dummyMeta;
     dummyMeta.nsPresentationTime = framePTS;
-    dummyMeta.discontinuity = false;
     dummyMeta.trimStartNs  = 0;
     dummyMeta.trimEndNs    = 0;
     AUDIODECODER_DECODE_WITH_METADATA_FAILURE(mAudioDecoderController, tempHandle, dummyMeta, Status::EX_ILLEGAL_STATE);

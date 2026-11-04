@@ -2368,6 +2368,147 @@ UT_ADD_TEST(VTS_L1_AudioDecoder, decodeBufferWithMetadata_neg)
     }
 }
 
+/**
+* @brief Test the positive operational mode functionality of the audio decoder.
+*
+* This test verifies that the audio decoder operational mode can be successfully retrieved.
+*
+* **Test Group ID:** Basic: 01@n
+* **Test Case ID:** 026@n
+* **Priority:** High@n
+* @n
+* **Pre-Conditions:** None@n
+* **Dependencies:** None@n
+* **User Interaction:** None@n
+* @n
+* **Test Procedure:**@n
+* |Variation / Step|Description|Test Data|Expected Result|Notes|
+* |----------------|-----------|---------|---------------|-----|
+* |01|Get the supported IDs and loop through the available decoder|None|None|None|
+* |02|Open the audio decoder with the codec and create audioDecoderController with listener|_codec, _decoder.supportsSecure, listener, audioDecoderController|status.isOk() should be true, audioDecoderController != nullptr|Should pass|
+* |03|Verify the state of the decoder after open|state|state should be READY|Should pass|
+* |04|start the decoder|audioDecoderController|status should be ok|Should pass|
+* |05|Check the state of the decoder|None|state should be STARTED, status should be ok|Should pass|
+* |06|Get the operational mode of the decoder|None|operationalMode should be TUNNELLED or NON_TUNNELLED|Should pass|
+* |07|Stop the decoder|None|state should be READY, status should be ok|Should pass|
+* |08|Close the audio decoder and verify cleanup succeeded|audioDecoderController, _aidl_return|status.isOk() should be true, _aidl_return = true|Should pass|
+*/
+UT_ADD_TEST(VTS_L1_AudioDecoder, getoperationalmode_pos)
+{
+    std::vector<IAudioDecoder::Id> decoderIds;
+    sp<IAudioDecoder> audioDecoder;
+    audiodecoder::Capabilities capabilities;
+    ::android::binder::Status status;
+    OperationalMode operationalMode;
+
+    /* Get the Audio decoder IDs */
+    AUDIODECODER_MANAGER_GETAUDIODECODERIDS(decoderIds);
+
+    for(const auto& _decoderId: decoderIds)
+    {
+        /* Get Audio decoder handle */
+        AUDIODECODER_MANAGER_GETAUDIODECODER(_decoderId, audioDecoder);
+
+        /* Get Capabilities of Audio Decoder */
+        AUDIODECODER_GETCAPABILITIES(audioDecoder, &capabilities);
+
+        for(const auto& _codec: capabilities.supportedCodecs)
+        {
+            sp<IAudioDecoderController> audioDecoderController;
+            sp<IAudioDecoderControllerListener> controllerListener = new AudioDecoderControllerListener();
+
+            /* Open the Decoder */
+            AUDIODECODER_OPEN_SUCCESS(audioDecoder, _codec, capabilities.supportsSecure, controllerListener, audioDecoderController, true);
+
+            /* Start the decoder */
+            AUDIODECODER_START_SUCCESS(audioDecoder, audioDecoderController, true);
+
+            /* Get the operational mode */
+            AUDIODECODER_GET_OPERATIONALMODE_SUCCESS(audioDecoder, operationalMode);
+
+            UT_ASSERT_TRUE((operationalMode == OperationalMode::TUNNELLED) || (operationalMode == OperationalMode::NON_TUNNELLED));
+
+            /* Stop the decoder */
+            AUDIODECODER_STOP_SUCCESS(audioDecoder, audioDecoderController, true);
+
+            /* Close the decoder */
+            AUDIODECODER_CLOSE_SUCCESS(audioDecoder, audioDecoderController, true);
+        }
+    }
+}
+
+/**
+* @brief Test the negative operational mode functionality of the audio decoder.
+*
+* This test verifies that attempting to get the operational mode before
+* starting the decoder fails with EX_ILLEGAL_STATE.
+*
+* **Test Group ID:** Basic: 01@n
+* **Test Case ID:** 026@n
+* **Priority:** High@n
+* @n
+* **Pre-Conditions:** None@n
+* **Dependencies:** None@n
+* **User Interaction:** None@n
+* @n
+* **Test Procedure:**@n
+* |Variation / Step|Description|Test Data|Expected Result|Notes|
+* |----------------|-----------|---------|---------------|-----|
+* |01|Get the supported IDs and loop through the available decoder|None|None|None|
+* |02|Open the audio decoder with the codec and create audioDecoderController with listener|_codec, _decoder.supportsSecure, listener, audioDecoderController|status.isOk() should be true, audioDecoderController != nullptr|Should pass|
+* |03|Verify the state of the decoder after open|state|state should be READY|Should pass|
+* |04|Get the operational mode before starting the decoder|None|status should be EX_ILLEGAL_STATE|Should pass|
+* |05|start the decoder|audioDecoderController|status should be ok|Should pass|
+* |06|Check the state of the decoder|None|state should be STARTED, status should be ok|Should pass|
+* |07|Stop the decoder|None|state should be READY, status should be ok|Should pass|
+* |08|Get the operational mode before starting the decoder|None|status should be EX_ILLEGAL_STATE|Should pass|
+* |09|Close the audio decoder and verify cleanup succeeded|audioDecoderController, _aidl_return|status.isOk() should be true, _aidl_return = true|Should pass|
+*/
+UT_ADD_TEST(VTS_L1_AudioDecoder, getoperationalmode_neg)
+{
+    std::vector<IAudioDecoder::Id> decoderIds;
+    sp<IAudioDecoder> audioDecoder;
+    audiodecoder::Capabilities capabilities;
+    ::android::binder::Status status;
+    OperationalMode operationalMode;
+
+    /* Get the Audio decoder IDs */
+    AUDIODECODER_MANAGER_GETAUDIODECODERIDS(decoderIds);
+
+    for(const auto& _decoderId: decoderIds)
+    {
+        /* Get Audio decoder handle */
+        AUDIODECODER_MANAGER_GETAUDIODECODER(_decoderId, audioDecoder);
+
+        /* Get Capabilities of Audio Decoder */
+        AUDIODECODER_GETCAPABILITIES(audioDecoder, &capabilities);
+
+        for(const auto& _codec: capabilities.supportedCodecs)
+        {
+            sp<IAudioDecoderController> audioDecoderController;
+            sp<IAudioDecoderControllerListener> controllerListener = new AudioDecoderControllerListener();
+
+            /* Open the Decoder */
+            AUDIODECODER_OPEN_SUCCESS(audioDecoder, _codec, capabilities.supportsSecure, controllerListener, audioDecoderController, true);
+
+            /* Get the operational mode before starting the decoder should fail */
+            AUDIODECODER_GET_OPERATIONALMODE_FAILURE(audioDecoder, operationalMode, Status::EX_ILLEGAL_STATE);
+
+            /* Start the decoder */
+            AUDIODECODER_START_SUCCESS(audioDecoder, audioDecoderController, true);
+
+            /* Stop the decoder */
+            AUDIODECODER_STOP_SUCCESS(audioDecoder, audioDecoderController, true);
+
+            /* Get the operational mode before starting the decoder should fail */
+            AUDIODECODER_GET_OPERATIONALMODE_FAILURE(audioDecoder, operationalMode, Status::EX_ILLEGAL_STATE);
+
+            /* Close the decoder */
+            AUDIODECODER_CLOSE_SUCCESS(audioDecoder, audioDecoderController, true);
+        }
+    }
+}
+
 /** @} */ // End of AUDIO_DECODER_HALTEST L1 File
 /** @} */ // End of AUDIO_DECODER_HALTEST
 /** @} */ // End of AUDIO_DECODER Module

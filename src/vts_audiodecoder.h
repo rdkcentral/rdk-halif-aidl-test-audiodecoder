@@ -94,6 +94,7 @@
 #include <ut_kvp_profile.h>
 #include <ut_control_plane.h>
 
+#include "com/rdk/hal/OperationalMode.h"
 #include "com/rdk/hal/audiodecoder/IAudioDecoderManager.h"
 #include "com/rdk/hal/audiodecoder/BnAudioDecoderControllerListener.h"
 #include "com/rdk/hal/audiodecoder/BnAudioDecoderEventListener.h"
@@ -130,58 +131,6 @@ extern sp<IAudioDecoderManager> gAudioDecoderManager;
 #endif
 #define MAX_TRANSITORY_STATE_WAIT_MS 10
 #define MAX_FINAL_STATE_WAIT_MS  500
-
-/*#ifndef ENABLE_UT_INFO_LOGGING
-    // Only WARNING and ERROR logs are enabled; DEBUG and INFO are disabled
-    #ifdef UT_LOG_DEBUG
-        #undef UT_LOG_DEBUG
-    #endif
-    #define UT_LOG_DEBUG(...)
-    #ifdef UT_LOG_INFO
-        #undef UT_LOG_INFO
-    #endif
-    #define UT_LOG_INFO(...)
-#else //ENABLE_UT_INFO_LOGGING
-    // ENABLE_UT_INFO_LOGGING is defined: use UT_LOG_LEVEL to control log macros
-    #define UT_LOG_LEVEL_NONE    0
-    #define UT_LOG_LEVEL_ERROR   1
-    #define UT_LOG_LEVEL_WARNING 2
-    #define UT_LOG_LEVEL_INFO    3
-    #define UT_LOG_LEVEL_DEBUG   4
-
-    #ifndef UT_LOG_LEVEL
-        #define UT_LOG_LEVEL UT_LOG_LEVEL_INFO
-    #endif
-
-    // DEBUG
-    #if UT_LOG_LEVEL < UT_LOG_LEVEL_DEBUG
-        #ifdef UT_LOG_DEBUG
-            #undef UT_LOG_DEBUG
-        #endif
-        #define UT_LOG_DEBUG(...)
-    #endif
-    // INFO
-    #if UT_LOG_LEVEL < UT_LOG_LEVEL_INFO
-        #ifdef UT_LOG_INFO
-            #undef UT_LOG_INFO
-        #endif
-        #define UT_LOG_INFO(...)
-    #endif
-    // WARNING
-    #if UT_LOG_LEVEL < UT_LOG_LEVEL_WARNING
-        #ifdef UT_LOG_WARNING
-            #undef UT_LOG_WARNING
-        #endif
-        #define UT_LOG_WARNING(...)
-    #endif
-    // ERROR
-    #if UT_LOG_LEVEL < UT_LOG_LEVEL_ERROR
-        #ifdef UT_LOG_ERROR
-            #undef UT_LOG_ERROR
-        #endif
-        #define UT_LOG_ERROR(...)
-    #endif
-#endif //ENABLE_UT_INFO_LOGGING*/
 
 #define AUDIODECODER_MANAGER_GETAUDIODECODERIDS(decoderIds) \
     do { \
@@ -251,7 +200,7 @@ extern sp<IAudioDecoderManager> gAudioDecoderManager;
                     break; \
                 case PropertyValue::Value::Tag::stringValue: \
                     UT_LOG_INFO("Result getProperty(IN:property[%s], OUT:propertyValue[%s]), status:[isOK:%s, exception:%s]", audiodecoder::toString(property).c_str(), \
-                    propertyValue->value->get<PropertyValue::Value::Tag::stringValue>().string(), \
+                    propertyValue->value->get<PropertyValue::Value::Tag::stringValue>().c_str(), \
                     UT_Control_GetMapString(bool_mapTable, status.isOk()), \
                     UT_Control_GetMapString(statusException_mapTable, status.exceptionCode())); \
                     break; \
@@ -455,6 +404,38 @@ extern sp<IAudioDecoderManager> gAudioDecoderManager;
         UT_ASSERT_EQUAL(status.exceptionCode(), exception); \
     } while (0)
 
+#define AUDIODECODER_GET_OPERATIONALMODE_SUCCESS(audioDecoder, operationalMode) \
+    do { \
+        ::android::binder::Status status; \
+        UT_LOG_INFO("Calling getCurrentOperationalMode(OUT:operationalMode[])"); \
+        status = audioDecoder->getCurrentOperationalMode(&operationalMode); \
+        UT_LOG_INFO("Result getCurrentOperationalMode(OUT:operationalMode[%s]), status:[isOK:%s, exception:%s]", \
+            UT_Control_GetMapString(decoder_operationalMode_mapTable, static_cast<int32_t>(operationalMode)), \
+            UT_Control_GetMapString(bool_mapTable, status.isOk()), \
+            UT_Control_GetMapString(statusException_mapTable, status.exceptionCode())); \
+        UT_ASSERT_TRUE(status.isOk()); \
+        UT_ASSERT_EQUAL(status.exceptionCode(), Status::EX_NONE); \
+    } while (0)
+
+#define AUDIODECODER_GET_OPERATIONALMODE_FAILURE(audioDecoder, operationalMode, exception) \
+    do { \
+        ::android::binder::Status status; \
+        UT_LOG_INFO("Calling getCurrentOperationalMode(OUT:operationalMode[])"); \
+        status = audioDecoder->getCurrentOperationalMode(&operationalMode); \
+        UT_LOG_INFO("Result getCurrentOperationalMode(OUT:operationalMode[%s]), status:[isOK:%s, exception:%s]", \
+            UT_Control_GetMapString(decoder_operationalMode_mapTable, static_cast<int32_t>(operationalMode)), \
+            UT_Control_GetMapString(bool_mapTable, status.isOk()), \
+            UT_Control_GetMapString(statusException_mapTable, status.exceptionCode())); \
+        if(exception == Status::EX_NONE) \
+        { \
+            UT_ASSERT_TRUE(status.isOk()); \
+            UT_ASSERT_EQUAL(status.exceptionCode(), Status::EX_NONE); \
+        } else { \
+            UT_ASSERT_FALSE(status.isOk()); \
+            UT_ASSERT_EQUAL(status.exceptionCode(), exception); \
+        } \
+    } while (0)
+
 #define AUDIODECODER_START_SUCCESS(audioDecoder, audioDecoderController, stateCheck) \
     do { \
         ::android::binder::Status status; \
@@ -516,22 +497,19 @@ extern sp<IAudioDecoderManager> gAudioDecoderManager;
     } while (0)
 
 /* decodeBufferWithMetadata only submits data frames; EOS is driven via signalEndOfStream(). */
-#define AUDIODECODER_DECODE_WITH_METADATA_SUCCESS(decoderID, audioDecoderController, bufferHandle, metadata) \
+#define AUDIODECODER_DECODE_WITH_METADATA_SUCCESS(decoderID, audioDecoderController, bufferHandle, metadata, decoderResult) \
     do { \
         ::android::binder::Status status; \
-        bool _aidl_return; \
-        UT_LOG_INFO("[DecoderID: %d] Calling decodeBufferWithMetadata(IN:bufferHandle[0x%016" PRIx64 "], IN:PTS[%" PRId64"], IN:trimStartNs[%d], IN:trimEndNs[%d], IN:discontinuity[%s])", \
+        UT_LOG_INFO("[DecoderID: %d] Calling decodeBufferWithMetadata(IN:bufferHandle[0x%016" PRIx64 "], IN:PTS[%" PRId64"], IN:trimStartNs[%d], IN:trimEndNs[%d])", \
             decoderID, (uint64_t)(bufferHandle), (int64_t)(metadata).nsPresentationTime, \
-            (metadata).trimStartNs, (metadata).trimEndNs, \
-            UT_Control_GetMapString(bool_mapTable, (metadata).discontinuity)); \
-        status = (audioDecoderController)->decodeBufferWithMetadata(bufferHandle, metadata, &_aidl_return); \
-        UT_LOG_INFO("[DecoderID: %d] Result decodeBufferWithMetadata(OUT:_aidl_return[%s]), status:[isOK:%s, exception:%s]", \
-            decoderID, UT_Control_GetMapString(bool_mapTable, _aidl_return), \
+            (metadata).trimStartNs, (metadata).trimEndNs); \
+        status = (audioDecoderController)->decodeBufferWithMetadata(bufferHandle, metadata, &decoderResult); \
+        UT_LOG_INFO("[DecoderID: %d] Result decodeBufferWithMetadata(OUT:decoderResult[%s]), status:[isOK:%s, exception:%s]", \
+            decoderID, UT_Control_GetMapString(bool_mapTable, decoderResult), \
             UT_Control_GetMapString(bool_mapTable, status.isOk()), \
             UT_Control_GetMapString(statusException_mapTable, status.exceptionCode())); \
         UT_ASSERT_TRUE(status.isOk()); \
         UT_ASSERT_EQUAL(status.exceptionCode(), Status::EX_NONE); \
-        UT_ASSERT_TRUE(_aidl_return); \
     } while (0)
 
 
@@ -540,10 +518,9 @@ extern sp<IAudioDecoderManager> gAudioDecoderManager;
     do { \
         ::android::binder::Status status; \
         bool _aidl_return = false; \
-        UT_LOG_INFO("Calling decodeBufferWithMetadata(IN:bufferHandle[0x%016" PRIx64 "], IN:PTS[%" PRId64 "], IN:trimStartNs[%d], IN:trimEndNs[%d], IN:discontinuity[%s])", \
+        UT_LOG_INFO("Calling decodeBufferWithMetadata(IN:bufferHandle[0x%016" PRIx64 "], IN:PTS[%" PRId64 "], IN:trimStartNs[%d], IN:trimEndNs[%d])", \
             (uint64_t)(bufferHandle), (int64_t)(metadata).nsPresentationTime, \
-            (metadata).trimStartNs, (metadata).trimEndNs, \
-            UT_Control_GetMapString(bool_mapTable, (metadata).discontinuity)); \
+            (metadata).trimStartNs, (metadata).trimEndNs); \
         status = (audioDecoderController)->decodeBufferWithMetadata(bufferHandle, metadata, &_aidl_return); \
         UT_LOG_INFO("Result decodeBufferWithMetadata(OUT:_aidl_return[%s]), status:[isOK:%s, exception:%s]", \
             UT_Control_GetMapString(bool_mapTable, _aidl_return), \
@@ -792,20 +769,12 @@ typedef struct DecodedAudioFrame
 {
     int64_t framePTS;
     bool isMetaAvailable;
-    bool isTunnel;
     com::rdk::hal::audiodecoder::FrameType frameType { com::rdk::hal::audiodecoder::FrameType::PCM };
     int64_t frameBufferHandle;
     std::shared_ptr<const audiodecoder::FrameMetadata> frameMetadata;
     std::vector<uint8_t> socPrivate;
     chrono::steady_clock::time_point receiveTime;
 }DecodedAudioFrame_t;
-
-enum class FrameOutputMode
-{
-    UNKNOWN,
-    TUNNEL,
-    NON_TUNNEL
-};
 
 /* Input frame to decoder */
 typedef struct InputAudioFrame
@@ -850,7 +819,6 @@ public:
 
     bool getNextFrame(DecodedAudioFrame_t &frameInfo, int32_t waitTime, bool popFrame);
     void resetFrames();
-    FrameOutputMode getFrameOutputMode() const { return mFrameOutputMode.load(); }
 
     /* Returns true if onDecodeBufferAvailable fired within waitTimeMs, false on timeout */
     bool waitForDecodeBufferAvailable(int32_t waitTimeMs);
@@ -870,7 +838,6 @@ private:
     queue<DecodedAudioFrame_t> mFrameQueue;
     mutex mQueueMutex;
     condition_variable mFrameAvailable;
-    atomic<FrameOutputMode> mFrameOutputMode{FrameOutputMode::UNKNOWN};
     atomic<bool> mShutdownFlag;
     int32_t mDecoderID = -1;
 
@@ -889,16 +856,11 @@ private:
 class AudioDecoderEventListener : public BnAudioDecoderEventListener
 {
 public:
-    static int32_t mUsedDecoderID;
+
     AudioDecoderEventListener(): mCurrentState(AudioDecoderState::CLOSED)
     {
-        AudioDecoderEventListener::mUsedDecoderID = -1;
     }
 
-    static int32_t getUsedDecoder()
-    {
-        return AudioDecoderEventListener::mUsedDecoderID;
-    }
     virtual ~AudioDecoderEventListener() = default;
 
     ::android::binder::Status onDecodeError(::com::rdk::hal::audiodecoder::ErrorCode errorCode, int32_t vendorErrorCode) override;
@@ -939,83 +901,6 @@ private:
     condition_variable mErrorAvailable;
     queue<ErrorDetails_t> mErrors;
     int32_t mDecoderID = -1;
-};
-
-class AudioDecoderTest
-{
-public:
-    AudioDecoderTest(IAudioDecoder::Id decoderId, sp<IAudioDecoder> decoderHandle,
-                sp<AudioDecoderControllerListener> controlListener,
-                sp<AudioDecoderEventListener> eventListener,
-                sp<IAVBuffer> AVBufferManager, IAVBufferHelper* avbufferHelper,
-                bool secureDecode, testConfiguration_t config, bool isSinkAttached);
-
-    ~AudioDecoderTest();
-
-    void run(bool validateMetrics);
-    void runForOutputMode(bool validateMetrics, bool expectedTunnelMode);
-
-    void getDecoderMetrics(int32_t &framesDecoded, int32_t &decodeErrors, int32_t &framesDropped);
-
-private:
-    IAudioDecoder::Id mDecoderId;
-    sp<IAudioDecoder> mDecoderHandle;
-    sp<AudioDecoderControllerListener> mControlListener;
-    sp<AudioDecoderEventListener> mEventListener;
-    sp<IAVBuffer> mAVBufferManager;
-    bool mSecureDecode;
-    testConfiguration_t mTestConfiguration;
-    deque<InputAudioFrame_t> mInputFrame;
-    IAVBufferHelper* mAVbufferHelper;
-    bool mIsSinkAttached;
-    Pool mAudioPool;
-    sp<IAVBufferSpaceListener> mBufferListener;
-    mutex mInputFrameMutex;
-    sp<IAudioDecoderController> mAudioDecoderController;
-    PropertyValue mAvSourcePropertyValue;
-    ifstream mInputFile;
-    int32_t mDecodeQueueFullCount = 0;
-    bool    mEosSubmitted         = false;
-    bool    mSubmittedInSession   = false;
-    std::optional<bool> mExpectedTunnelMode;
-    // Set false if setupAudioDecoder() bails out before opening the decoder
-    // (e.g. input file missing) — run() checks this to skip startDecoding()/
-    // teardownDecoder() rather than using a null mAudioDecoderController.
-    bool    mSetupSucceeded       = false;
-
-    struct FrameValidationState
-    {
-        int32_t  framesDecoded               = 0;
-        int32_t  eosFramesReceived           = 0;
-        int32_t  discontinuityFramesReceived = 0;
-        bool     isPassThrough               = false;
-        uint64_t accumulatedSize             = 0;
-        int64_t  prevPTS                     = -1;
-        int64_t  expectedNextPTS             = -1;
-        int32_t  decodedSampleRate           = 0;
-        int32_t  decodedChannels             = 0;
-        audiodecoder::PCMFormat decodedFormat{};
-        int32_t  decodeErrors                = 0;
-        bool     validatePTS                 = false;
-    };
-
-    void setupAudioDecoder();
-    void runInternal(bool validateMetrics, std::optional<bool> expectedTunnelMode);
-    void startDecoding();
-    void teardownDecoder();
-    void validateDecodedFrame();
-
-    bool prepareInputBuffer(int32_t frameSize, int64_t& audioBufferHandle);
-    void handleControlPoints(int64_t framePTS);
-    void trackInputFrame(int64_t framePTS, bool errorFrame);
-    audiodecoder::InputBufferMetadata buildMetadata(size_t frameIndex, int64_t framePTS);
-    void submitFrame(int64_t audioBufferHandle, const audiodecoder::InputBufferMetadata& metadata);
-    void handleMidStreamEOS(int64_t framePTS);
-
-    bool checkPassThrough   (const DecodedAudioFrame_t& frame, int32_t framesDecoded, bool& isPassThrough);
-    void checkPTSSpacing    (const DecodedAudioFrame_t& frame, int64_t frameBytes, FrameValidationState& state);
-    void checkFrameMetadata (const DecodedAudioFrame_t& frame, FrameValidationState& state);
-    void validatePostLoopMetrics(const FrameValidationState& state);
 };
 
 /**

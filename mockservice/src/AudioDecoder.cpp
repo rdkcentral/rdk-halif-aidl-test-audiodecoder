@@ -359,6 +359,20 @@ namespace com
                     return android::binder::Status::ok();
                 }
 
+                android::binder::Status AudioDecoderController::getCurrentOperationalMode(OperationalMode* _aidl_return)
+                {
+                    if (_aidl_return == nullptr)
+                    {
+                        return android::binder::Status::fromExceptionCode(android::binder::Status::EX_NULL_POINTER);
+                    }
+                    if(this->mAudioDecoderState != State::STARTED)
+                    {
+                        return android::binder::Status::fromExceptionCode(android::binder::Status::EX_ILLEGAL_STATE);
+                    }
+                    *_aidl_return = OperationalMode::NON_TUNNEL;
+                    return android::binder::Status::ok();
+                }
+
                 AudioDecoderController::AudioDecoderController(IAudioDecoder::Id id, AudioDecoder *parentDecoder,
                                                                android::sp<audiodecoder::IAudioDecoderControllerListener> listener,
                                                                Codec codec, bool secure)

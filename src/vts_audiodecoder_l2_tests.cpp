@@ -655,13 +655,17 @@ UT_ADD_TEST(VTS_L2_AudioDecoder, SignalEndOfStreamLifecycle)
                 }
 
                 audiodecoder::InputBufferMetadata metadata;
+                bool decoderResults = false;
+
                 metadata.nsPresentationTime = 1000000;
                 metadata.trimStartNs = 0;
                 metadata.trimEndNs = 0;
 
                 eventListener->resetErrors();
 
-                AUDIODECODER_DECODE_WITH_METADATA_SUCCESS(decoderId.value, audioDecoderController, bufferHandle, metadata);
+                AUDIODECODER_DECODE_WITH_METADATA_SUCCESS(decoderId.value, audioDecoderController, bufferHandle, metadata, decoderResults);
+
+                UT_ASSERT_TRUE(decoderResults);
 
                 controlListener->resetEndOfStream();
                 AUDIODECODER_SIGNAL_EOS_SUCCESS(decoder, audioDecoderController, false);

@@ -497,21 +497,19 @@ extern sp<IAudioDecoderManager> gAudioDecoderManager;
     } while (0)
 
 /* decodeBufferWithMetadata only submits data frames; EOS is driven via signalEndOfStream(). */
-#define AUDIODECODER_DECODE_WITH_METADATA_SUCCESS(decoderID, audioDecoderController, bufferHandle, metadata) \
+#define AUDIODECODER_DECODE_WITH_METADATA_SUCCESS(decoderID, audioDecoderController, bufferHandle, metadata, decoderResult) \
     do { \
         ::android::binder::Status status; \
-        bool _aidl_return; \
         UT_LOG_INFO("[DecoderID: %d] Calling decodeBufferWithMetadata(IN:bufferHandle[0x%016" PRIx64 "], IN:PTS[%" PRId64"], IN:trimStartNs[%d], IN:trimEndNs[%d])", \
             decoderID, (uint64_t)(bufferHandle), (int64_t)(metadata).nsPresentationTime, \
             (metadata).trimStartNs, (metadata).trimEndNs); \
-        status = (audioDecoderController)->decodeBufferWithMetadata(bufferHandle, metadata, &_aidl_return); \
-        UT_LOG_INFO("[DecoderID: %d] Result decodeBufferWithMetadata(OUT:_aidl_return[%s]), status:[isOK:%s, exception:%s]", \
-            decoderID, UT_Control_GetMapString(bool_mapTable, _aidl_return), \
+        status = (audioDecoderController)->decodeBufferWithMetadata(bufferHandle, metadata, &decoderResult); \
+        UT_LOG_INFO("[DecoderID: %d] Result decodeBufferWithMetadata(OUT:decoderResult[%s]), status:[isOK:%s, exception:%s]", \
+            decoderID, UT_Control_GetMapString(bool_mapTable, decoderResult), \
             UT_Control_GetMapString(bool_mapTable, status.isOk()), \
             UT_Control_GetMapString(statusException_mapTable, status.exceptionCode())); \
         UT_ASSERT_TRUE(status.isOk()); \
         UT_ASSERT_EQUAL(status.exceptionCode(), Status::EX_NONE); \
-        UT_ASSERT_TRUE(_aidl_return); \
     } while (0)
 
 

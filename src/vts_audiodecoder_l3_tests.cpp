@@ -147,8 +147,10 @@ public:
         }
     }
 
-    bool isDecoderUsable(const IAudioDecoder::Id& decoderId, audiodecoder::Capabilities* capabilities,
-                        const testConfiguration_t& testConfig, bool secureDecode)
+    bool isDecoderUsable(const IAudioDecoder::Id& decoderId,
+                         audiodecoder::Capabilities* capabilities,
+                         const testConfiguration_t& testConfig,
+                         bool secureDecode)
     {
         auto it = std::find_if(gAudiodecoders_hfp.begin(), gAudiodecoders_hfp.end(), [decoderId](const audioDecoder& item) {
             return item.id == decoderId.value;
@@ -165,54 +167,65 @@ public:
 
     bool runSequentialDecode(testConfiguration_t& testConfig, bool secureDecode)
     {
-        for (const auto& [_decoderId, decoderHandle, controlListener, eventListener, capabilities] : mAudioDecoderList)
-        {
-            HeapMetrics beforeHeapMetrics, afterHeapMetrics;
-            bool isSinkAttached = false;
-            bool validateMetrics = true;
+        bool isTestExecuted = false;
+        bool isSinkAttached = false;
+        bool validateMetrics = true;
 
-            if (!isDecoderUsable(_decoderId, capabilities, testConfig, secureDecode))
+        try {
+            for (const auto& [_decoderId, decoderHandle, controlListener, eventListener, capabilities] : mAudioDecoderList)
             {
-                continue;
+                HeapMetrics beforeHeapMetrics, afterHeapMetrics;
+
+                if (!isDecoderUsable(_decoderId, capabilities, testConfig, secureDecode))
+                {
+                    continue;
+                }
+
+                /* Reset per-stream state so each stream's errors and frames are validated independently */
+                resetDecodeSession(eventListener, controlListener);
+
+                /* Get heap metrics */
+                AVBUFFER_GETMETRICS(mAVBufferManager, secureDecode, beforeHeapMetrics);
+
+                {
+                    AudioDecoderTest decodeTest(_decoderId, decoderHandle, controlListener,
+                                                eventListener, mAVBufferManager, mAVbufferHelper,
+                                                secureDecode, testConfig, isSinkAttached);
+
+                    decodeTest.run(validateMetrics);
+                } /* decodeTest destructor called here — destroyPool fires before metrics check */
+
+                /* Get heap metrics */
+                AVBUFFER_GETMETRICS(mAVBufferManager, secureDecode, afterHeapMetrics);
+
+                /* check if the decoder freed all the buffer pools */
+                UT_ASSERT_TRUE(beforeHeapMetrics.secure == afterHeapMetrics.secure);
+                UT_ASSERT_TRUE(beforeHeapMetrics.bytesUsed == afterHeapMetrics.bytesUsed);
+                UT_ASSERT_TRUE(beforeHeapMetrics.bytesTotal == afterHeapMetrics.bytesTotal);
+
+                isTestExecuted = true;
+                /* TODO: check if this required or not */
+                //controlListener->shutdown();
             }
-
-            /* Reset per-stream state so each stream's errors and frames are validated independently */
-            resetDecodeSession(eventListener, controlListener);
-
-            /* Get heap metrics */
-            AVBUFFER_GETMETRICS(mAVBufferManager, secureDecode, beforeHeapMetrics);
-
-            {
-                AudioDecoderTest decodeTest(_decoderId, decoderHandle, controlListener,
-                                            eventListener, mAVBufferManager, mAVbufferHelper,
-                                            secureDecode, testConfig, isSinkAttached);
-
-                decodeTest.run(validateMetrics);
-            } /* decodeTest destructor called here — destroyPool fires before metrics check */
-
-            /* Get heap metrics */
-            AVBUFFER_GETMETRICS(mAVBufferManager, secureDecode, afterHeapMetrics);
-
-            /* check if the decoder freed all the buffer pools */
-            UT_ASSERT_TRUE(beforeHeapMetrics.secure == afterHeapMetrics.secure);
-            UT_ASSERT_TRUE(beforeHeapMetrics.bytesUsed == afterHeapMetrics.bytesUsed);
-            UT_ASSERT_TRUE(beforeHeapMetrics.bytesTotal == afterHeapMetrics.bytesTotal);
-
-            /* TODO: check if this required or not */
-            //controlListener->shutdown();
+        } catch (const std::exception& ex) {
+            UT_LOG_ERROR("Exception in runSequentialDecode(): %s", ex.what());
+        } catch (...) {
+            UT_LOG_ERROR("Unknown exception in runSequentialDecode()");
         }
-        return true;
+        return isTestExecuted;
     }
 
     bool runConcurrentDecode(testConfiguration_t& testConfig, bool secureDecode)
     {
+        bool isSinkAttached = false;
+        bool validateMetrics = true;
+        bool isTestExecuted = false;
+
         try {
             vector<thread> threads;
             vector<AudioDecoderTest> decoderTestList;
             HeapMetrics beforeHeapMetrics, afterHeapMetrics;
-            bool isSinkAttached = false;
 
-            //TODO: add check of decoder metrics
             /* Get heap metrics */
             AVBUFFER_GETMETRICS(mAVBufferManager, secureDecode, beforeHeapMetrics);
 
@@ -220,8 +233,6 @@ public:
                 std::vector<std::unique_ptr<AudioDecoderTest>> decoderTests;
                 for (const auto& [_decoderId, decoderHandle, controlListener, eventListener, capabilities] : mAudioDecoderList)
                 {
-                    bool validateMetrics = true;
-
                     if (!isDecoderUsable(_decoderId, capabilities, testConfig, secureDecode))
                     {
                         continue;
@@ -238,6 +249,8 @@ public:
                                          decoderTest.get(), validateMetrics);
 
                     decoderTests.push_back(std::move(decoderTest));
+
+                    isTestExecuted = true;
                 }
                 for (auto& t : threads)
                 {
@@ -254,7 +267,6 @@ public:
             UT_ASSERT_TRUE(beforeHeapMetrics.bytesUsed == afterHeapMetrics.bytesUsed);
             UT_ASSERT_TRUE(beforeHeapMetrics.bytesTotal == afterHeapMetrics.bytesTotal);
 
-            return true;
         } catch (const std::exception& ex) {
             UT_LOG_ERROR("Exception in runConcurrentDecode: %s", ex.what());
             UT_ASSERT_TRUE(false);
@@ -262,20 +274,14 @@ public:
             UT_LOG_ERROR("Unknown exception in runConcurrentDecode");
             UT_ASSERT_TRUE(false);
         }
-        return false;
+
+        return isTestExecuted;
     }
 
     void runSingleProcessTest(const char *testName, bool secureMode, bool concurrentMode)
     {
-        if (secureMode && !isSecureModeSupported())
-        {
-            UT_LOG_INFO("Skipping test '%s': Secure mode is not supported", testName);
-            GTEST_SKIP() << "Secure mode is not supported";
-            return;
-        }
-
-        bool tunnelMode = false;
         vector<testConfiguration_t> testConfiguration;
+        bool isTestExecuted = false;
 
         vts_audiodecoder_parse_testconfig(gAudioDecoderTestConfiguration, gModuleName, gTestGroup, testName, testConfiguration);
 
@@ -285,11 +291,9 @@ public:
             {
                 if (!runConcurrentDecode(test, secureMode))
                 {
-                    UT_LOG_INFO("Skipping test '%s': observed frame output does not match requested non-secure mode",
-                                testName);
-                    GTEST_SKIP() << "Requested audio decoder output mode is not supported";
-                    return;
+                    continue;
                 }
+                isTestExecuted = true;
             }
         }
         else
@@ -298,12 +302,16 @@ public:
             {
                 if (!runSequentialDecode(test, secureMode))
                 {
-                    UT_LOG_INFO("Skipping test '%s': observed frame output does not match requested non-secure mode",
-                                testName);
-                    GTEST_SKIP() << "Requested audio decoder output mode is not supported";
-                    return;
+                    continue;
                 }
+                isTestExecuted = true;
             }
+        }
+
+        if(isTestExecuted == false)
+        {
+            UT_LOG_INFO("Skipping test '%s': No valid test configuration executed", testName);
+            GTEST_SKIP() << "No valid test configuration executed";
         }
     }
 
@@ -317,6 +325,9 @@ public:
                 delete capabilities;
             }
             mAudioDecoderList.clear();
+
+            releaseAVBufferHelperInstance(mAVbufferHelper);
+
             //TODO: check right place to call joinThreadPool
             //android::IPCThreadState::self()->joinThreadPool();
         } catch (const std::exception& ex) {

@@ -157,10 +157,9 @@ private:
     PropertyValue mAvSourcePropertyValue;
     ifstream mInputFile;
     int32_t mDecodeQueueFullCount = 0;
-    bool    mEosSubmitted         = false;
-    bool    mSubmittedInSession   = false;
     bool    mDecoderSetup = false;
     OperationalMode mOperationMode;
+    bool mTrimAppliedbyDecoder = false;
 
     struct FrameValidationState
     {
@@ -187,7 +186,7 @@ private:
     void handleControlPoints(int64_t framePTS);
     void trackInputFrame(int64_t framePTS, bool errorFrame);
     audiodecoder::InputBufferMetadata buildMetadata(size_t frameIndex, int64_t framePTS);
-    void submitFrame(int64_t audioBufferHandle, const audiodecoder::InputBufferMetadata& metadata);
+    void submitFrame(int64_t audioBufferHandle, const audiodecoder::InputBufferMetadata& metadata, bool errorFrame);
     void handleMidStreamEOS(int64_t framePTS);
 
     bool checkPassThrough   (const DecodedAudioFrame_t& frame, int32_t framesDecoded, bool& isPassThrough);

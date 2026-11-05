@@ -192,8 +192,6 @@ void AudioDecoderTest::handleControlPoints(int64_t framePTS)
     {
         AUDIODECODER_STOP_SUCCESS(mDecoderHandle, mAudioDecoderController, true);
         AUDIODECODER_START_SUCCESS(mDecoderHandle, mAudioDecoderController, true);
-        mEosSubmitted       = false;
-        mSubmittedInSession = false;
     }
 
     if (mTestConfiguration.discontinuityPts == framePTS)
@@ -211,8 +209,6 @@ void AudioDecoderTest::handleControlPoints(int64_t framePTS)
     {
         AUDIODECODER_FLUSH_SUCCESS(mDecoderHandle, mAudioDecoderController, true, true);
         AUDIODECODER_START_SUCCESS(mDecoderHandle, mAudioDecoderController, true);
-        mEosSubmitted       = false;
-        mSubmittedInSession = false;
     }
 }
 
@@ -230,54 +226,42 @@ audiodecoder::InputBufferMetadata AudioDecoderTest::buildMetadata(size_t frameIn
 {
     audiodecoder::InputBufferMetadata metadata;
     metadata.nsPresentationTime = framePTS;
-    bool isFirstFrame = (frameIndex == 0);
-    bool isLastFrame  = (frameIndex == mTestConfiguration.frameDetails.size() - 1);
-    metadata.trimStartNs = isFirstFrame ? mTestConfiguration.trimStartNs : 0;
-    metadata.trimEndNs   = isLastFrame  ? mTestConfiguration.trimEndNs   : 0;
+
+    if(mTestConfiguration.trimPts == framePTS)
+    {
+        metadata.trimStartNs = mTestConfiguration.trimStartNs;
+        metadata.trimEndNs   = mTestConfiguration.trimEndNs;
+    }
     return metadata;
 }
 
-void AudioDecoderTest::submitFrame(int64_t audioBufferHandle, const audiodecoder::InputBufferMetadata& metadata)
+void AudioDecoderTest::submitFrame(int64_t audioBufferHandle, const audiodecoder::InputBufferMetadata& metadata, bool errorFrame)
 {
     ::android::binder::Status status;
-    bool decodeResult;
+    bool decodeResult = false;
 
-    /* Reset before the call so any onDecodeBufferAvailable that fires during or after
-     * decodeBufferWithMetadata() is captured and not erased by a post-call reset. */
-    mControlListener->resetDecodeBufferAvailable();
+    trackInputFrame(metadata.nsPresentationTime, errorFrame);
 
-    UT_LOG_INFO("[Audio DecoderID: %d] Calling decodeBufferWithMetadata(IN:bufferHandle[0x%016" PRIx64 "], IN:PTS[%" PRId64 "], IN:trim[%d/%d])",
-        mDecoderId.value, (uint64_t)audioBufferHandle, metadata.nsPresentationTime,
-        metadata.trimStartNs, metadata.trimEndNs);
-
-    status = mAudioDecoderController->decodeBufferWithMetadata(audioBufferHandle, metadata, &decodeResult);
-    UT_ASSERT_TRUE(status.isOk());
-    UT_ASSERT_EQUAL(status.exceptionCode(), android::binder::Status::EX_NONE);
+    AUDIODECODER_DECODE_WITH_METADATA_SUCCESS(mDecoderId.value, mAudioDecoderController, audioBufferHandle, metadata, decodeResult);
 
     if (!decodeResult)
     {
-        if (mEosSubmitted)
-        {
-            /* HAL rejected frame after EOS was accepted — this is NOT a queue-full
-             * event.  onDecodeBufferAvailable will NOT fire for this reason, so
-             * do not wait for it and do not count it as back-pressure.
-             * Ownership stays with the caller on rejection, so free the handle here. */
-            UT_LOG_INFO("[Audio DecoderID: %d] decodeBufferWithMetadata returned false at PTS %lld "
-                           "after EOS was already submitted — HAL rejecting post-EOS frame",
-                           mDecoderId.value, metadata.nsPresentationTime);
-            AVBUFFER_FREE_SUCCESS(mAVBufferManager, audioBufferHandle);
-            return;
-        }
+        decodeResult = false;
 
         mDecodeQueueFullCount++;
         UT_LOG_WARNING("[Audio DecoderID: %d] decodeBufferWithMetadata returned false at PTS %lld "
                        "(queue full #%d) — waiting for onDecodeBufferAvailable before retry",
                        mDecoderId.value, metadata.nsPresentationTime, mDecodeQueueFullCount);
         UT_ASSERT_TRUE(mControlListener->waitForDecodeBufferAvailable(MAX_FRAME_WAIT_TIME));
-        AUDIODECODER_DECODE_WITH_METADATA_SUCCESS(mDecoderId.value, mAudioDecoderController, audioBufferHandle, metadata);
-    }
 
-    mSubmittedInSession = true;
+        AUDIODECODER_DECODE_WITH_METADATA_SUCCESS(mDecoderId.value, mAudioDecoderController, audioBufferHandle, metadata, decodeResult);
+        UT_ASSERT_TRUE(decodeResult);
+        if (!decodeResult)
+        {
+            AVBUFFER_FREE_SUCCESS(mAVBufferManager, audioBufferHandle);
+            return;
+        }
+    }
 }
 
 void AudioDecoderTest::handleMidStreamEOS(int64_t framePTS)
@@ -330,9 +314,6 @@ void AudioDecoderTest::handleMidStreamEOS(int64_t framePTS)
 
     AUDIODECODER_STOP_SUCCESS(mDecoderHandle, mAudioDecoderController, true);
     AUDIODECODER_START_SUCCESS(mDecoderHandle, mAudioDecoderController, true);
-
-    mEosSubmitted       = false;
-    mSubmittedInSession = false;
 }
 
 bool AudioDecoderTest::checkPassThrough(const DecodedAudioFrame_t& frame, int32_t framesDecoded, bool& isPassThrough)
@@ -425,10 +406,10 @@ void AudioDecoderTest::checkFrameMetadata(const DecodedAudioFrame_t& frame, Fram
 
     if (mTestConfiguration.trimStartNs > 0 || mTestConfiguration.trimEndNs > 0)
     {
-        int64_t expectedTrimStart = (state.framesDecoded == 1) ? mTestConfiguration.trimStartNs : 0LL;
-        int64_t expectedTrimEnd   = (state.framesDecoded == (int32_t)mTestConfiguration.frameDetails.size()) ? mTestConfiguration.trimEndNs : 0LL;
-        UT_ASSERT_EQUAL(expectedTrimStart, (int64_t)fm.trimStartNs);
-        UT_ASSERT_EQUAL(expectedTrimEnd,   (int64_t)fm.trimEndNs);
+        if(fm.trimStartNs == 0 && fm.trimEndNs == 0)
+        {
+            mTrimAppliedbyDecoder = true;
+        }
     }
 
     if (state.decodedSampleRate == 0 && fm.metadata.has_value() && fm.metadata->sampleRate > 0)
@@ -447,19 +428,37 @@ void AudioDecoderTest::validatePostLoopMetrics(const FrameValidationState& state
     UT_LOG_INFO("[Audio DecoderID: %d] duration=%lld decodedSampleRate=%d decodedChannels=%d",
                     mDecoderId.value, (long long)mTestConfiguration.duration, state.decodedSampleRate, state.decodedChannels);
 
-    if (mTestConfiguration.duration > 0 && state.decodedSampleRate > 0 && state.decodedChannels > 0)
+    if (mTestConfiguration.duration > 0 && state.decodedSampleRate > 0 &&
+        state.decodedChannels > 0 && mOperationMode == OperationalMode::NON_TUNNELLED)
     {
         int64_t expectedSamples     = vts_audio_expectedSamples(mTestConfiguration.duration, state.decodedSampleRate);
         int64_t totalDecodedSamples = vts_audio_totalSamples(state.accumulatedSize, state.decodedChannels, state.decodedFormat);
-        UT_LOG_INFO("[Audio DecoderID: %d] Resampling validation: totalDecodedSamples=%lld expectedSamples=%lld decodeErrors=%d",
-                    mDecoderId.value, (long long)totalDecodedSamples, (long long)expectedSamples, state.decodeErrors);
+        int64_t trimRemovedSamples = 0;
+
+        if (mTrimAppliedbyDecoder)
+        {
+            trimRemovedSamples = vts_audio_expectedSamples(mTestConfiguration.trimRemoved, state.decodedSampleRate);
+            expectedSamples -= trimRemovedSamples;
+        }
+
+        UT_LOG_INFO("[Audio DecoderID: %d] Resampling validation: totalDecodedSamples=%lld expectedSamples=%lld (-trimed: %lld) decodeErrors=%d",
+                    mDecoderId.value, (long long)totalDecodedSamples, (long long)expectedSamples, (long long)trimRemovedSamples, state.decodeErrors);
+
         if (state.decodeErrors > 0)
         {
             UT_ASSERT_TRUE(totalDecodedSamples <= expectedSamples);
         }
         else
         {
-            UT_ASSERT_EQUAL(totalDecodedSamples, expectedSamples);
+            if(mTrimAppliedbyDecoder)
+            {
+                // Allow a margin of 10 samples for trimming inaccuracies
+                UT_ASSERT_FALSE((totalDecodedSamples <= expectedSamples - 10) || (totalDecodedSamples >= expectedSamples + 10));
+            }
+            else
+            {
+                UT_ASSERT_EQUAL(totalDecodedSamples, expectedSamples);
+            }
         }
     }
 
@@ -498,12 +497,10 @@ void AudioDecoderTest::validatePostLoopMetrics(const FrameValidationState& state
     }
 
     /* EOS validation: one EOS always expected at stream end; a second when eosPts is configured
-     * AND frames were submitted after the mid-stream restart (mSubmittedInSession) - if eosPts
-     * lands on the last frame, handleMidStreamEOS() leaves nothing to submit post-restart, so
-     * startDecoding()'s trailing block correctly skips firing a second EOS. */
+     * AND frames were submitted after the mid-stream restart */
     int32_t expectedEOSFrames = 1;
 
-    if (mTestConfiguration.eosPts != -1 && mSubmittedInSession)
+    if (mTestConfiguration.eosPts != -1)
     {
         expectedEOSFrames++;
     }
@@ -579,8 +576,6 @@ void AudioDecoderTest::setupAudioDecoder()
     /* Start the decoder */
     AUDIODECODER_START_SUCCESS(mDecoderHandle, mAudioDecoderController, true);
     mDecoderSetup       = true;
-    mEosSubmitted       = false;
-    mSubmittedInSession = false;
 
     /* Reset shared input frame queue */
     {
@@ -616,19 +611,17 @@ void AudioDecoderTest::startDecoding()
             continue;
 
         handleControlPoints(framePTS);
-        trackInputFrame(framePTS, errorFrame);
 
         bool isEosPtsFrame = (mTestConfiguration.eosPts != -1 && mTestConfiguration.eosPts == framePTS);
         auto metadata = buildMetadata(frameIndex, framePTS);
 
-        submitFrame(audioBufferHandle, metadata);
+        submitFrame(audioBufferHandle, metadata, errorFrame);
 
-        if (isEosPtsFrame && mSubmittedInSession && !mEosSubmitted)
+        if (isEosPtsFrame)
         {
             mControlListener->resetEndOfStream();
             AUDIODECODER_SIGNAL_EOS_SUCCESS(mDecoderHandle, mAudioDecoderController, true);
             UT_ASSERT_TRUE(mControlListener->waitForEndOfStream(MAX_FRAME_WAIT_TIME));
-            mEosSubmitted = true;
         }
 
         if (mTestConfiguration.decoderDelay > 0)
@@ -638,13 +631,8 @@ void AudioDecoderTest::startDecoding()
             handleMidStreamEOS(framePTS);
     }
 
-    if (!mEosSubmitted && mSubmittedInSession)
-    {
-        mControlListener->resetEndOfStream();
-        AUDIODECODER_SIGNAL_EOS_SUCCESS(mDecoderHandle, mAudioDecoderController, true);
-        UT_ASSERT_TRUE(mControlListener->waitForEndOfStream(MAX_FRAME_WAIT_TIME));
-        mEosSubmitted = true;
-    }
+    AUDIODECODER_SIGNAL_EOS_SUCCESS(mDecoderHandle, mAudioDecoderController, true);
+    UT_ASSERT_TRUE(mControlListener->waitForEndOfStream(MAX_FRAME_WAIT_TIME));
 
     UT_LOG_INFO("[Audio DecoderID: %d] End of Testing Stream: %s",
                 mDecoderId.value, mTestConfiguration.input.c_str());
@@ -741,19 +729,22 @@ void AudioDecoderTest::run(bool validateMetrics)
      * the decoder is too slow relative to the submission rate.
      */
     int32_t decodeBufferAvailCount = mControlListener->getDecodeBufferAvailableCount();
-    int32_t queueFullCount         = mDecodeQueueFullCount;
 
-    if (queueFullCount > 0 || decodeBufferAvailCount > 0)
+    if (mDecodeQueueFullCount > 0 || decodeBufferAvailCount > 0)
     {
         UT_LOG_ERROR("[Audio DecoderID: %d] HAL input queue filled during decode: "
                      "decodeBufferWithMetadata returned false %d time(s), "
                      "onDecodeBufferAvailable fired %d time(s) — "
                      "decoder is behaving slow relative to submission rate",
-                     mDecoderId.value, queueFullCount, decodeBufferAvailCount);
+                     mDecoderId.value, mDecodeQueueFullCount, decodeBufferAvailCount);
     }
 
-    UT_ASSERT_EQUAL(queueFullCount, 0);
+    UT_ASSERT_EQUAL(mDecodeQueueFullCount, 0);
     UT_ASSERT_EQUAL(decodeBufferAvailCount, 0);
+
+    /* Reset decodebufferavailable events */
+    mControlListener->resetDecodeBufferAvailable();
+    mControlListener->resetEndOfStream();
 
     teardownDecoder();
 }

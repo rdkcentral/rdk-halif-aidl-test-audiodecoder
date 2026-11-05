@@ -107,6 +107,8 @@ UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *m
         string framePTS    = streamList + "." + to_string(i) + "." +"PTS";
         string rmsDiff     = streamList + "." + to_string(i) + "." +"rms_diff_threshold";
         string decodeTime  = streamList + "." + to_string(i) + "." +"decode_time_threshold";
+        string trimPts      = streamList + "." + to_string(i) + "." +"trim_pts";
+        string trimRemoved  = streamList + "." + to_string(i) + "." +"trim_removed";
         string trimStart   = streamList + "." + to_string(i) + "." +"trim.0";
         string trimEnd     = streamList + "." + to_string(i) + "." +"trim.1";
         string decoderDelay         = controlList + "." + "delay_between_decode_calls";
@@ -188,8 +190,15 @@ UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *m
 
         testDetails.rms_diff_threashold = ut_kvp_getDoubleField(kvpTestInstance, rmsDiff.c_str());
         testDetails.decodeTime = ut_kvp_getDoubleField(kvpTestInstance, decodeTime.c_str());
-        testDetails.trimStartNs  = ut_kvp_getUInt64Field(kvpTestInstance, trimStart.c_str());
-        testDetails.trimEndNs    = ut_kvp_getUInt64Field(kvpTestInstance, trimEnd.c_str());
+        testDetails.trimPts = -1;
+        testDetails.trimStartNs = testDetails.trimEndNs = 0;
+        if(ut_kvp_fieldPresent(kvpTestInstance, trimPts.c_str()))
+        {
+            testDetails.trimPts = ut_kvp_getUInt64Field(kvpTestInstance, trimPts.c_str());
+            testDetails.trimRemoved = ut_kvp_getUInt64Field(kvpTestInstance, trimRemoved.c_str());
+            testDetails.trimStartNs  = ut_kvp_getUInt64Field(kvpTestInstance, trimStart.c_str());
+            testDetails.trimEndNs    = ut_kvp_getUInt64Field(kvpTestInstance, trimEnd.c_str());
+        }
         testDetails.decoderDelay = ut_kvp_getUInt32Field(kvpTestInstance, decoderDelay.c_str());
         testDetails.stopPts      = ut_kvp_getUInt64Field(kvpTestInstance, stopPts.c_str());
         testDetails.discontinuityPts = ut_kvp_getUInt64Field(kvpTestInstance, discontinuityPts.c_str());

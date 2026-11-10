@@ -829,8 +829,6 @@ public:
 
     bool waitForEndOfStream(int32_t waitTimeMs);
     void resetEndOfStream();
-    int32_t getEndOfStreamCount() const { return mEndOfStreamCount.load(); }
-    void resetEndOfStreamCount()        { mEndOfStreamCount = 0; }
 
     void shutdown();
     void setDecoderID(int32_t id);
@@ -847,7 +845,6 @@ private:
     condition_variable mDecodeBufferCV;
 
     atomic<bool>    mEndOfStreamFlag;
-    atomic<int32_t> mEndOfStreamCount{0};
     mutex mEndOfStreamMutex;
     condition_variable mEndOfStreamCV;
 };

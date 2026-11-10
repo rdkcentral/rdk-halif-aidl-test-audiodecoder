@@ -250,14 +250,29 @@ Status AudioDecoderControllerListener::onDecodeBufferAvailable()
 Status AudioDecoderControllerListener::onEndOfStream()
 {
     UT_LOG_INFO("[Audio DecoderID: %d] onEndOfStream callback received", mDecoderID);
-    mEndOfStreamCount++;
     {
         lock_guard<mutex> lock(mEndOfStreamMutex);
         mEndOfStreamFlag = true;
     }
     mEndOfStreamCV.notify_one();
-    mFrameAvailable.notify_all();
     return Status::ok();
+}
+
+bool AudioDecoderControllerListener::waitForEndOfStream(int32_t waitTimeMs)
+{
+    unique_lock<mutex> lock(mEndOfStreamMutex);
+    mEndOfStreamCV.wait_for(
+        lock,
+        chrono::milliseconds(waitTimeMs),
+        [this]() { return mEndOfStreamFlag.load() || mShutdownFlag.load(); }
+    );
+    return mEndOfStreamFlag.load();
+}
+
+void AudioDecoderControllerListener::resetEndOfStream()
+{
+    lock_guard<mutex> lock(mEndOfStreamMutex);
+    mEndOfStreamFlag = false;
 }
 
 /**
@@ -287,23 +302,6 @@ void AudioDecoderControllerListener::resetDecodeBufferAvailable()
 {
     lock_guard<mutex> lock(mDecodeBufferMutex);
     mDecodeBufferAvailableFlag = false;
-}
-
-bool AudioDecoderControllerListener::waitForEndOfStream(int32_t waitTimeMs)
-{
-    unique_lock<mutex> lock(mEndOfStreamMutex);
-    mEndOfStreamCV.wait_for(
-        lock,
-        chrono::milliseconds(waitTimeMs),
-        [this]() { return mEndOfStreamFlag.load() || mShutdownFlag.load(); }
-    );
-    return mEndOfStreamFlag.load();
-}
-
-void AudioDecoderControllerListener::resetEndOfStream()
-{
-    lock_guard<mutex> lock(mEndOfStreamMutex);
-    mEndOfStreamFlag = false;
 }
 
 /* Event listener Class Functions */
@@ -455,7 +453,6 @@ void resetDecodeSession(sp<AudioDecoderEventListener> eventListener,
     controlListener->resetDecodeBufferAvailable();
     controlListener->resetDecodeBufferAvailableCount();
     controlListener->resetEndOfStream();
-    controlListener->resetEndOfStreamCount();
 }
 
 /**

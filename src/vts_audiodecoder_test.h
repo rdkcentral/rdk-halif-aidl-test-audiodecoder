@@ -173,7 +173,7 @@ private:
         int32_t  decodedSampleRate           = 0;
         int32_t  decodedChannels             = 0;
         audiodecoder::PCMFormat decodedFormat{};
-        int32_t  decodeErrors                = 0;
+        int32_t  errorFramesPushed           = 0;
         bool     validatePTS                 = false;
     };
 
@@ -189,7 +189,8 @@ private:
     void submitFrame(int64_t audioBufferHandle, const audiodecoder::InputBufferMetadata& metadata, bool errorFrame);
     void handleMidStreamEOS(int64_t framePTS);
 
-    bool checkPassThrough   (const DecodedAudioFrame_t& frame, int32_t framesDecoded, bool& isPassThrough);
+    bool checkPassThrough   (const DecodedAudioFrame_t& frame);
+    void frameDecodeLatencyCheck(const DecodedAudioFrame_t& frame);
     void checkPTSSpacing    (const DecodedAudioFrame_t& frame, int64_t frameBytes, FrameValidationState& state);
     void checkFrameMetadata (const DecodedAudioFrame_t& frame, FrameValidationState& state);
     void validatePostLoopMetrics(const FrameValidationState& state);

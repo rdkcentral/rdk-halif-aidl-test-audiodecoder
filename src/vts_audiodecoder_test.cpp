@@ -284,38 +284,11 @@ void AudioDecoderTest::handleMidStreamEOS(int64_t framePTS)
     UT_LOG_INFO("[Audio DecoderID: %d] Restarting decoder after mid-stream EOS at PTS:%lld",
                 mDecoderId.value, framePTS);
 
-    /* Validate HAL metrics accumulated so far (stop()/start() below does not reset them) */
-    //TODO: why do we need this validation, we are doing at the end
-    {
-        int32_t metricsFrameDecoded, metricsDecodeErrors, metricsFramesDropped;
-        getDecoderMetrics(metricsFrameDecoded, metricsDecodeErrors, metricsFramesDropped);
-
-        int32_t eosErrorFrames = static_cast<int32_t>(count_if(
-            mTestConfiguration.frameDetails.begin(), mTestConfiguration.frameDetails.end(),
-            [&](const auto& f) { return get<2>(f) && get<1>(f) <= framePTS; }));
-        int32_t eosExpectedDecoded = static_cast<int32_t>(count_if(
-            mTestConfiguration.frameDetails.begin(), mTestConfiguration.frameDetails.end(),
-            [&](const auto& f) { return get<1>(f) <= framePTS; })) - eosErrorFrames;
-
-        UT_LOG_DEBUG("[Audio DecoderID: %d] EOS Metrics: FramesDecoded=%d (expected=%d), DecodeErrors=%d, FramesDropped=%d",
-            mDecoderId.value, metricsFrameDecoded, eosExpectedDecoded, metricsDecodeErrors, metricsFramesDropped);
-
-        if (metricsFrameDecoded != -1)
-        {
-            UT_ASSERT_EQUAL(metricsFrameDecoded, eosExpectedDecoded);
-        }
-        if (metricsDecodeErrors != -1)
-        {
-            UT_ASSERT_EQUAL(metricsDecodeErrors, eosErrorFrames);
-        }
-        if (metricsFramesDropped != -1)
-        {
-            UT_ASSERT_EQUAL(metricsFramesDropped, 0);
-        }
-    }
 
     mControlListener->resetEndOfStream();
 
+    /* TODO: stop will not reset the metrics as per the spec, so any accumulated metrics before this point will persist
+       If in future spec changes to reset metrics on stop(), this section may need to be updated accordingly */
     AUDIODECODER_STOP_SUCCESS(mDecoderHandle, mAudioDecoderController, true);
     AUDIODECODER_START_SUCCESS(mDecoderHandle, mAudioDecoderController, true);
 }
@@ -484,9 +457,8 @@ void AudioDecoderTest::validatePostLoopMetrics(const FrameValidationState& state
 
     if (metricsFrameDecoded != -1)
     {
-        //TODO: stoppts, eosPts should also be validated with actual values
-        if ((mTestConfiguration.flushPts == -1) && (mTestConfiguration.flushRestPts == -1) /*&&
-            (mTestConfiguration.stopPts == -1) && (mTestConfiguration.eosPts == -1)*/)
+        //TODO: in future if stop resets the metrics stoppts, eosPts should be validated accordingly
+        if ((mTestConfiguration.flushPts == -1) && (mTestConfiguration.flushRestPts == -1))
         {
             UT_ASSERT_EQUAL(metricsFrameDecoded, metricsExpectedDecoded);
         }
@@ -587,6 +559,28 @@ void AudioDecoderTest::teardownDecoder()
 
     /* Close the decoder */
     AUDIODECODER_CLOSE_SUCCESS(mDecoderHandle, mAudioDecoderController, true);
+}
+
+void AudioDecoderTest::cleanupAudioDecoder()
+{
+    DecodedAudioFrame_t decodedFrame;
+    while (mControlListener->getNextFrame(decodedFrame, 2000, true))
+    {
+        if(decodedFrame.frameBufferHandle != -1)
+        {
+            bool isBufferValid;
+
+            UT_LOG_ERROR("[Audio DecoderID: %d] Frames received after the audio decoder has been stopped", mDecoderId.value);
+            UT_ASSERT_TRUE(false);
+
+            AVBUFFER_ISVALID_SUCCESS(mAVBufferManager, decodedFrame.frameBufferHandle, isBufferValid);
+
+            if (isBufferValid)
+            {
+                AVBUFFER_FREE_SUCCESS(mAVBufferManager, decodedFrame.frameBufferHandle);
+            }
+        }
+    }
 }
 
 void AudioDecoderTest::startDecoding()
@@ -725,6 +719,8 @@ void AudioDecoderTest::validateDecodedFrame()
         }
     }
     validatePostLoopMetrics(state);
+
+    cleanupAudioDecoder();
 }
 
 void AudioDecoderTest::run(bool validateMetrics)

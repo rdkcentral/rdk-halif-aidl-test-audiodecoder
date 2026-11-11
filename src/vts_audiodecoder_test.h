@@ -180,6 +180,7 @@ private:
     void setupAudioDecoder();
     void startDecoding();
     void teardownDecoder();
+    void cleanupAudioDecoder();
     void validateDecodedFrame();
 
     bool prepareInputBuffer(int32_t frameSize, int64_t& audioBufferHandle);

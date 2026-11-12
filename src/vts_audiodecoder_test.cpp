@@ -241,6 +241,8 @@ void AudioDecoderTest::submitFrame(int64_t audioBufferHandle, const audiodecoder
     ::android::binder::Status status;
     bool decodeResult = false;
 
+    mControlListener->resetDecodeBufferAvailable();
+
     trackInputFrame(metadata.nsPresentationTime, errorFrame);
 
     AUDIODECODER_DECODE_WITH_METADATA_SUCCESS(mDecoderId.value, mAudioDecoderController, audioBufferHandle, metadata, decodeResult);
@@ -391,7 +393,7 @@ void AudioDecoderTest::checkFrameMetadata(const DecodedAudioFrame_t& frame, Fram
         state.decodedFormat     = fm.metadata->format;
         UT_LOG_INFO("[Audio DecoderID: %d] PCM metadata: sampleRate=%d channels=%d format=%s",
                     mDecoderId.value, state.decodedSampleRate, state.decodedChannels,
-                    ::com::rdk::hal::audiodecoder::toString(state.decodedFormat).c_str());
+                    audiodecoder::toString(state.decodedFormat).c_str());
     }
 }
 
@@ -616,6 +618,7 @@ void AudioDecoderTest::startDecoding()
             handleMidStreamEOS(framePTS);
     }
 
+    mControlListener->resetEndOfStream();
     AUDIODECODER_SIGNAL_EOS_SUCCESS(mDecoderHandle, mAudioDecoderController, true);
     UT_ASSERT_TRUE(mControlListener->waitForEndOfStream(MAX_FRAME_WAIT_TIME));
 

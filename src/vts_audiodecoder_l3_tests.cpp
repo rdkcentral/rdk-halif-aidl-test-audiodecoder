@@ -209,8 +209,10 @@ public:
             }
         } catch (const std::exception& ex) {
             UT_LOG_ERROR("Exception in runSequentialDecode(): %s", ex.what());
+            UT_ASSERT_TRUE(false);
         } catch (...) {
             UT_LOG_ERROR("Unknown exception in runSequentialDecode()");
+            UT_ASSERT_TRUE(false);
         }
         return isTestExecuted;
     }
@@ -326,7 +328,11 @@ public:
             }
             mAudioDecoderList.clear();
 
-            releaseAVBufferHelperInstance(mAVbufferHelper);
+            if (mAVbufferHelper)
+            {
+                releaseAVBufferHelperInstance(mAVbufferHelper);
+                mAVbufferHelper = nullptr;
+            }
 
             //TODO: check right place to call joinThreadPool
             //android::IPCThreadState::self()->joinThreadPool();

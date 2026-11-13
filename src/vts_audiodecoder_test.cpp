@@ -755,6 +755,7 @@ void AudioDecoderTest::run(bool validateMetrics)
      * false during decoding, indicating the HAL's internal input queue filled up —
      * the decoder is too slow relative to the submission rate.
      */
+     //TODO: remove this
     int32_t decodeBufferAvailCount = mControlListener->getDecodeBufferAvailableCount();
 
     if (mDecodeQueueFullCount > 0 || decodeBufferAvailCount > 0)

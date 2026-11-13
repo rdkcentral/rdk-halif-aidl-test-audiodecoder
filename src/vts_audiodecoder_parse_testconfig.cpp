@@ -121,6 +121,7 @@ UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *m
         string sinkFlushPts         = controlList + "." + "sink_flush_pts";
         string numFramesOverrideKey = controlList + "." + "num_frames_override";
         string streamDuration       = streamsDetails + "." + string(resultKVP) + "." + "duration";
+        string sinkBackpressure     = controlList + "." + "sink_backpressure";
 
         ut_kvp_getStringField(kvpTestInstance, input.c_str(), resultKVP, UT_KVP_MAX_ELEMENT_SIZE);
         fullPath = currentPath;
@@ -207,6 +208,11 @@ UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *m
         testDetails.eosPts       = ut_kvp_getUInt64Field(kvpTestInstance, eosPts.c_str());
         testDetails.sinkEosPts          = ut_kvp_getUInt64Field(kvpTestInstance, sinkEosPts.c_str());
         testDetails.sinkFlushPts        = ut_kvp_getUInt64Field(kvpTestInstance, sinkFlushPts.c_str());
+        testDetails.isSinkBackpressure = false; // Default value before checking the test configuration
+        if(ut_kvp_fieldPresent(kvpTestInstance, sinkBackpressure.c_str()))
+        {
+            testDetails.isSinkBackpressure = ut_kvp_getBoolField(kvpTestInstance, sinkBackpressure.c_str());
+        }
 
         testConfiguration.push_back(testDetails);
     }

@@ -48,9 +48,11 @@ audiodecoder:
               - 149333333
               - 170666667
               - 192000000
+            trim_pts: 192000000
+            trim_removed: 11333333
             trim:
-              - 42666667
-              - 85333333
+              - 10000000
+              - 20000000
             rms_diff_threshold: 0.5
             decode_time_threshold: 100000
           - Name: tones_48k_2_192_ac3
@@ -65,8 +67,10 @@ audiodecoder:
               - 224000000
               - 256000000
               - 288000000
+            trim_pts: 288000000
+            trim_removed: 22000000
             trim:
-              - 64000000
-              - 128000000
+              - 10000000
+              - 20000000
             rms_diff_threshold: 0.5
             decode_time_threshold: 100000

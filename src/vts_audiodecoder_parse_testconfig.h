@@ -93,6 +93,8 @@ typedef struct testConfiguration
     int32_t numOfFrames;
     double rms_diff_threashold;
     int64_t decodeTime;
+    int64_t trimPts;
+    int64_t trimRemoved;
     int64_t trimStartNs;
     int64_t trimEndNs;
     int32_t decoderDelay;
@@ -103,6 +105,7 @@ typedef struct testConfiguration
     int64_t eosPts;
     int64_t sinkEosPts;
     int64_t sinkFlushPts;
+    bool    isSinkBackpressure;
     int64_t duration;
     /* Frame size, PTS, error frame */
     std::vector<std::tuple<int32_t, int64_t, bool>> frameDetails;

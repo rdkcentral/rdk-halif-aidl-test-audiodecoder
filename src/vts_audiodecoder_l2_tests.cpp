@@ -191,14 +191,14 @@ std::multimap<audiodecoder::Property, int32_t> validAC4IntProperties =
     {audiodecoder::Property::AC4_ASSOCIATED_AUDIO_MIXING_ENABLE, 1}
 };
 
-std::multimap<audiodecoder::Property, android::String16> validAC4StringProperties =
+std::multimap<audiodecoder::Property, std::string> validAC4StringProperties =
 {
-    {audiodecoder::Property::AC4_PREFERRED_LANG1, android::String16("")},
-    {audiodecoder::Property::AC4_PREFERRED_LANG1, android::String16("eng")},
-    {audiodecoder::Property::AC4_PREFERRED_LANG1, android::String16("fra")},
-    {audiodecoder::Property::AC4_PREFERRED_LANG2, android::String16("")},
-    {audiodecoder::Property::AC4_PREFERRED_LANG2, android::String16("eng")},
-    {audiodecoder::Property::AC4_PREFERRED_LANG2, android::String16("fra")}
+    {audiodecoder::Property::AC4_PREFERRED_LANG1, std::string("")},
+    {audiodecoder::Property::AC4_PREFERRED_LANG1, std::string("eng")},
+    {audiodecoder::Property::AC4_PREFERRED_LANG1, std::string("fra")},
+    {audiodecoder::Property::AC4_PREFERRED_LANG2, std::string("")},
+    {audiodecoder::Property::AC4_PREFERRED_LANG2, std::string("eng")},
+    {audiodecoder::Property::AC4_PREFERRED_LANG2, std::string("fra")}
 };
 
 /**
@@ -287,7 +287,7 @@ UT_ADD_TEST(VTS_L2_AudioDecoder, SetandGetProperties)
                         /* get the property */
                         AUDIODECODER_GET_PROPERTY_SUCCESS(decoder, property, getPropertyValue);
 
-                        android::String16 getValue = getPropertyValue->value->get<PropertyValue::Value::Tag::stringValue>();
+                        std::string getValue = getPropertyValue->value->get<PropertyValue::Value::Tag::stringValue>();
 
                         UT_ASSERT_EQUAL(value, getValue);
                     }
@@ -400,7 +400,7 @@ UT_ADD_TEST(VTS_L2_AudioDecoder, SetandGetProperties_multipleInstance)
                     /* get the property */
                     AUDIODECODER_GET_PROPERTY_SUCCESS(decoder, property, getPropertyValue);
 
-                    android::String16 getValue = getPropertyValue->value->get<PropertyValue::Value::Tag::stringValue>();
+                    std::string getValue = getPropertyValue->value->get<PropertyValue::Value::Tag::stringValue>();
 
                     UT_ASSERT_EQUAL(value, getValue);
                 }
@@ -655,14 +655,17 @@ UT_ADD_TEST(VTS_L2_AudioDecoder, SignalEndOfStreamLifecycle)
                 }
 
                 audiodecoder::InputBufferMetadata metadata;
+                bool decoderResults = false;
+
                 metadata.nsPresentationTime = 1000000;
-                metadata.discontinuity = false;
                 metadata.trimStartNs = 0;
                 metadata.trimEndNs = 0;
 
                 eventListener->resetErrors();
 
-                AUDIODECODER_DECODE_WITH_METADATA_SUCCESS(decoderId.value, audioDecoderController, bufferHandle, metadata);
+                AUDIODECODER_DECODE_WITH_METADATA_SUCCESS(decoderId.value, audioDecoderController, bufferHandle, metadata, decoderResults);
+
+                UT_ASSERT_TRUE(decoderResults);
 
                 controlListener->resetEndOfStream();
                 AUDIODECODER_SIGNAL_EOS_SUCCESS(decoder, audioDecoderController, false);

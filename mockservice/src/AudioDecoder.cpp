@@ -41,11 +41,10 @@ namespace com
             namespace audiodecoder
             {
 
-                bool isAlphabetOnly(const android::String16& str16)
+                bool isAlphabetOnly(const std::string& value)
                 {
-                    std::u16string str = str16.string();  // Convert String16 to std::u16string
-                    return !str.empty() && std::all_of(str.begin(), str.end(), [](char16_t c) {
-                        return (c >= u'A' && c <= u'Z') || (c >= u'a' && c <= u'z');
+                    return !value.empty() && std::all_of(value.begin(), value.end(), [](char c) {
+                        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
                     });
                 }
 
@@ -114,8 +113,8 @@ namespace com
                     this->mMetricsDecodeErrors = 0;
                     this->mMetricsFramesDropped = 0;
                     this->mAC4PresentationGroupIndex = -1;
-                    this->mAC4PreferredLang1 = android::String16("");
-                    this->mAC4PreferredLang2 = android::String16("");
+                    this->mAC4PreferredLang1 = "";
+                    this->mAC4PreferredLang2 = "";
                     this->mAC4AssociatedType = -1;
                     this->mAutoSelectionPriority = -1;
                     this->mAC4MixerBalance = 255;
@@ -359,6 +358,20 @@ namespace com
                     return android::binder::Status::ok();
                 }
 
+                android::binder::Status AudioDecoder::getCurrentOperationalMode(OperationalMode* _aidl_return)
+                {
+                    if (_aidl_return == nullptr)
+                    {
+                        return android::binder::Status::fromExceptionCode(android::binder::Status::EX_NULL_POINTER);
+                    }
+                    if(this->mAudioDecoderState != State::STARTED)
+                    {
+                        return android::binder::Status::fromExceptionCode(android::binder::Status::EX_ILLEGAL_STATE);
+                    }
+                    *_aidl_return = OperationalMode::NON_TUNNELLED;
+                    return android::binder::Status::ok();
+                }
+
                 AudioDecoderController::AudioDecoderController(IAudioDecoder::Id id, AudioDecoder *parentDecoder,
                                                                android::sp<audiodecoder::IAudioDecoderControllerListener> listener,
                                                                Codec codec, bool secure)
@@ -576,11 +589,6 @@ namespace com
                         return android::binder::Status::fromExceptionCode(android::binder::Status::EX_ILLEGAL_ARGUMENT);
                     }
                     if(metadata.trimEndNs < 0)
-                    {
-                        *_aidl_return = false;
-                        return android::binder::Status::fromExceptionCode(android::binder::Status::EX_ILLEGAL_ARGUMENT);
-                    }
-                    if(metadata.discontinuity)
                     {
                         *_aidl_return = false;
                         return android::binder::Status::fromExceptionCode(android::binder::Status::EX_ILLEGAL_ARGUMENT);
@@ -956,7 +964,7 @@ namespace com
                 android::binder::Status AudioDecoderController::setProperty( audiodecoder::Property property, const PropertyValue& propertyValue, bool* _aidl_return )
                 {
                     int32_t intvalue;
-                    android::String16 strvalue;
+                    std::string strvalue;
                     *_aidl_return = false;
                     if (!propertyValue.value.has_value())
                     {

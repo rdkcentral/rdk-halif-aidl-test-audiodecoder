@@ -74,10 +74,6 @@
 #include "com/rdk/hal/audiodecoder/BnAudioDecoderEventListener.h"
 
 #define VTS_TEST_CONFIG_PATH "./audiodecoder_test_configuration/vts_l3_test_config.yaml"
-#define VTS_AUDIOSINK_TEST_CONFIG_PATH "./audiosink_test_configuration/vts_l3_test_config.yaml"
-#define STREAM_DOWNLOAD_PATH "audiodecoder.stream_download_path"
-#define STREAM_INPUT_PATH "audiodecoder.input_streams_path"
-#define STREAM_REF_PATH "audiodecoder.reference_streams_path"
 
 using namespace std;
 using namespace com::rdk::hal;

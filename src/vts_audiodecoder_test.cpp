@@ -583,6 +583,7 @@ void AudioDecoderTest::cleanupAudioDecoder()
             }
         }
     }
+    mControlListener->resetEndOfStream();
 }
 
 void AudioDecoderTest::startDecoding()
@@ -618,7 +619,6 @@ void AudioDecoderTest::startDecoding()
             handleMidStreamEOS(framePTS);
     }
 
-    mControlListener->resetEndOfStream();
     AUDIODECODER_SIGNAL_EOS_SUCCESS(mDecoderHandle, mAudioDecoderController, true);
     UT_ASSERT_TRUE(mControlListener->waitForEndOfStream(MAX_FRAME_WAIT_TIME));
 
@@ -772,7 +772,6 @@ void AudioDecoderTest::run(bool validateMetrics)
 
     /* Reset decodebufferavailable events */
     mControlListener->resetDecodeBufferAvailable();
-    mControlListener->resetEndOfStream();
 
     teardownDecoder();
 }

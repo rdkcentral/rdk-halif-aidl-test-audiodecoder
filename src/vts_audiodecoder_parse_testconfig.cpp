@@ -80,9 +80,11 @@ UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *m
     const string controlList = testList + "." + "Controls";
     const string streamList = testList + "." + "Inputs" + "." + string("Streams");
     const string streamsDetails = string("AudioStreams");
+    const string inputStreamPath = string(module) + "." + "input_streams_path";
+    const string inputReferencePath = string(module) + "." + "reference_streams_path";
 
-    status = ut_kvp_getStringField(kvpTestInstance, STREAM_INPUT_PATH, streamInputPath, UT_KVP_MAX_ELEMENT_SIZE);
-    status = ut_kvp_getStringField(kvpTestInstance, STREAM_REF_PATH, streamRefPath, UT_KVP_MAX_ELEMENT_SIZE);
+    status = ut_kvp_getStringField(kvpTestInstance, inputStreamPath.c_str(), streamInputPath, UT_KVP_MAX_ELEMENT_SIZE);
+    status = ut_kvp_getStringField(kvpTestInstance, inputReferencePath.c_str(), streamRefPath, UT_KVP_MAX_ELEMENT_SIZE);
 
     streamCount = ut_kvp_getListCount(kvpTestInstance, streamList.c_str());
 

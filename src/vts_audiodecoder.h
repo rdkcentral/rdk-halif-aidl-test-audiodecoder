@@ -129,7 +129,7 @@ extern sp<IAudioDecoderManager> gAudioDecoderManager;
 #ifdef MAX_TRANSITORY_STATE_WAIT_MS
 #undef MAX_TRANSITORY_STATE_WAIT_MS
 #endif
-#define MAX_TRANSITORY_STATE_WAIT_MS 10
+#define MAX_TRANSITORY_STATE_WAIT_MS 1
 #define MAX_FINAL_STATE_WAIT_MS  500
 
 #define AUDIODECODER_MANAGER_GETAUDIODECODERIDS(decoderIds) \
@@ -548,7 +548,6 @@ extern sp<IAudioDecoderManager> gAudioDecoderManager;
         UT_ASSERT_EQUAL(status.exceptionCode(), Status::EX_NONE); \
         if (stateCheck) \
         { \
-            this_thread::sleep_for(chrono::milliseconds(MAX_FINAL_STATE_WAIT_MS)); \
             if (reset) \
             { \
                 AudioDecoderState lastState; \

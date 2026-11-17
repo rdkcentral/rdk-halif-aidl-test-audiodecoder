@@ -78,8 +78,8 @@ namespace com {
                     int32_t mLowLatency;
                     AVSource mAVSource;
                     int32_t mAC4PresentationGroupIndex;
-                    android::String16 mAC4PreferredLang1;
-                    android::String16 mAC4PreferredLang2;
+                    string mAC4PreferredLang1;
+                    string mAC4PreferredLang2;
                     int32_t mAC4AssociatedType;
                     int32_t mAutoSelectionPriority;
                     int32_t mAC4MixerBalance;
@@ -107,6 +107,7 @@ namespace com {
                     android::binder::Status close( const android::sp<audiodecoder::IAudioDecoderController>& audioDecoderController, bool* _aidl_return ) override;
                     android::binder::Status registerEventListener( const android::sp<audiodecoder::IAudioDecoderEventListener>& audioDecoderEventListener, bool* _aidl_return ) override;
                     android::binder::Status unregisterEventListener( const android::sp<audiodecoder::IAudioDecoderEventListener>& audioDecoderEventListener, bool* _aidl_return ) override;
+                    android::binder::Status getCurrentOperationalMode( OperationalMode* _aidl_return ) override;
                 };
 
                 // No-op listener to satisfy createAudioPool()'s non-null requirement

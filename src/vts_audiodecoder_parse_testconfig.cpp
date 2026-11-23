@@ -96,6 +96,7 @@ UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *m
 
         string streamName = streamList + "." + to_string(i) + "Name";
         ut_kvp_getStringField(kvpTestInstance, streamName.c_str(), resultKVP, UT_KVP_MAX_ELEMENT_SIZE);
+        testDetails.name = resultKVP;
 
         string input       = streamsDetails + "." + string(resultKVP) + "." +"input";
         string reference   = streamsDetails + "." + string(resultKVP) + "." +"reference";

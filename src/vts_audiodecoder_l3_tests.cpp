@@ -817,7 +817,7 @@ UT_ADD_TEST(VTS_L3_AudioDecoder, ADecode_Concurrent_NonSecure_StopStart)
  */
 UT_ADD_TEST(VTS_L3_AudioDecoder, ADecode_Concurrent_Secure)
 {
-    const char *testName = "Decode_Secure";
+    const char *testName = "Decode";
     bool secureMode = true;
     bool concurrentMode = true;
     runSingleProcessTest(testName, secureMode, concurrentMode);

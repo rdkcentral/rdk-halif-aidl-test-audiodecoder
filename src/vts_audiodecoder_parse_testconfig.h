@@ -80,6 +80,8 @@ using namespace com::rdk::hal;
 
 typedef struct testConfiguration
 {
+    /* Stream name as listed in Inputs.Streams (key into AudioStreams) */
+    std::string name;
     std::string input;
     std::string reference;
     audiodecoder::Codec codec;

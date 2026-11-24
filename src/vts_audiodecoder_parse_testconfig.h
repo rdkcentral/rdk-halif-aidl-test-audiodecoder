@@ -65,6 +65,7 @@
 #ifndef __VTS_AUDIODECODER_PARSE_TESTCONFIG_H__
 #define __VTS_AUDIODECODER_PARSE_TESTCONFIG_H__
 
+#include <optional>
 #include <ut.h>
 #include <ut_log.h>
 #include "ut_kvp_profile.h"
@@ -85,6 +86,8 @@ typedef struct testConfiguration
     std::string input;
     std::string reference;
     audiodecoder::Codec codec;
+    std::optional<audiodecoder::CSDAudioFormat> csdFormat;
+    std::vector<uint8_t> codecSpecificData;
     int32_t sampleRate;
     int32_t numChannels;
     audiodecoder::PCMFormat format;

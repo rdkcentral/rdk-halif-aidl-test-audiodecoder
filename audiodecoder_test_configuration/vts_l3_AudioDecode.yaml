@@ -590,6 +590,7 @@ audiodecoder:
               - 0
             decode_time_threshold: 100000
             rms_diff_threshold: 0.5
+            csd_format: MP4_AUDIO_SPECIFIC_CONFIG
 ####### EAC3 Streams ##############
           - Name: vts_eac3_48k_1ch_64k_eac3
             PTS:

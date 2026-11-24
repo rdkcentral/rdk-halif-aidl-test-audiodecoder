@@ -66,6 +66,24 @@
 #include "vts_audiodecoder_parse_testconfig.h"
 #include "vts_audiodecoder_helper_functions.h"
 
+namespace
+{
+std::optional<audiodecoder::CSDAudioFormat> parseCsdFormat(const string& format)
+{
+    if (format == "MP4_AUDIO_SPECIFIC_CONFIG")
+        return audiodecoder::CSDAudioFormat::MP4_AUDIO_SPECIFIC_CONFIG;
+    if (format == "ALS_SPECIFIC_CONFIG")
+        return audiodecoder::CSDAudioFormat::ALS_SPECIFIC_CONFIG;
+    if (format == "ALAC_SPECIFIC_CONFIG")
+        return audiodecoder::CSDAudioFormat::ALAC_SPECIFIC_CONFIG;
+    if (format == "EAC3_SPECIFIC_CONFIG")
+        return audiodecoder::CSDAudioFormat::EAC3_SPECIFIC_CONFIG;
+    if (format == "AC4_SPECIFIC_CONFIG")
+        return audiodecoder::CSDAudioFormat::AC4_SPECIFIC_CONFIG;
+    return std::nullopt;
+}
+}
+
 UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *module, const char *testGroup, const char *testName, vector<testConfiguration_t>& testConfiguration)
 {
     ut_kvp_status_t status;
@@ -101,6 +119,8 @@ UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *m
         string input       = streamsDetails + "." + string(resultKVP) + "." +"input";
         string reference   = streamsDetails + "." + string(resultKVP) + "." +"reference";
         string codec       = streamsDetails + "." + string(resultKVP) + "." +"codec";
+        string codecSpecificData = streamsDetails + "." + string(resultKVP) + "." + "codec_specific_data";
+        string csdFormat   = streamList + "." + to_string(i) + "." + "csd_format";
         string sampleRate  = streamsDetails + "." + string(resultKVP) + "." +"sample_rate";
         string channels    = streamsDetails + "." + string(resultKVP) + "." +"channels";
         string format      = streamsDetails + "." + string(resultKVP) + "." +"format";
@@ -140,6 +160,34 @@ UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *m
 
         ut_kvp_getStringField(kvpTestInstance, codec.c_str(), resultKVP, UT_KVP_MAX_ELEMENT_SIZE);
         testDetails.codec = vts_audioDecoder_helper_StringToCodec(string(resultKVP));
+
+        if (ut_kvp_fieldPresent(kvpTestInstance, csdFormat.c_str()))
+        {
+            char csdFormatValue[UT_KVP_MAX_ELEMENT_SIZE] = {0};
+            ut_kvp_getStringField(kvpTestInstance, csdFormat.c_str(), csdFormatValue, UT_KVP_MAX_ELEMENT_SIZE);
+            testDetails.csdFormat = parseCsdFormat(csdFormatValue);
+            if (!testDetails.csdFormat.has_value())
+            {
+                UT_LOG_ERROR("Unsupported CSD format '%s' for stream %s", csdFormatValue, testDetails.name.c_str());
+                return UT_STATUS_FAILURE;
+            }
+        }
+
+        if (ut_kvp_fieldPresent(kvpTestInstance, codecSpecificData.c_str()))
+        {
+            const int32_t codecSpecificDataCount = ut_kvp_getListCount(kvpTestInstance, codecSpecificData.c_str());
+            for (int32_t j = 0; j < codecSpecificDataCount; ++j)
+            {
+                const string bytePath = codecSpecificData + "." + to_string(j);
+                const uint32_t byteValue = ut_kvp_getUInt32Field(kvpTestInstance, bytePath.c_str());
+                if (byteValue > 0xFF)
+                {
+                    UT_LOG_ERROR("CSD byte value %u is out of range for stream %s", byteValue, testDetails.name.c_str());
+                    return UT_STATUS_FAILURE;
+                }
+                testDetails.codecSpecificData.push_back(static_cast<uint8_t>(byteValue));
+            }
+        }
 
         testDetails.sampleRate = ut_kvp_getUInt32Field(kvpTestInstance, sampleRate.c_str());
         testDetails.numChannels = ut_kvp_getUInt32Field(kvpTestInstance, channels.c_str());

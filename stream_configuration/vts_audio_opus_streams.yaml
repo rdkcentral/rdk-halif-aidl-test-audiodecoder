@@ -167,6 +167,9 @@ AudioStreams:
     format: S16LE                                # PCM format of the reference stream
     num_of_frames: 8                             # Total number of Opus audio frames
     duration: 160000000 # (960 samples/frame x 8 frames x 1e9) / 48000 Hz
+    codec_specific_data: [0x4F, 0x70, 0x75, 0x73, 0x48, 0x65, 0x61, 0x64, 0x01,
+                          0x06, 0x00, 0x00, 0x80, 0xBB, 0x00, 0x00, 0x00, 0x00,
+                          0x01, 0x04, 0x02, 0x00, 0x04, 0x01, 0x02, 0x03, 0x05]
     frame_size:                                 # Byte size for each Opus packet
       - 158
       - 112

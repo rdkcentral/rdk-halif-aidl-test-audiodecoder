@@ -467,6 +467,8 @@ typedef struct testConfiguration
     std::string input;           /* Path to input encoded stream file */
     std::string reference;       /* Path to reference PCM stream file */
     Codec codec;                 /* Codec type (e.g., AAC, OPUS) */
+    std::optional<CSDAudioFormat> csdFormat; /* Optional codec-specific data format */
+    std::vector<uint8_t> codecSpecificData; /* Optional codec-specific initialization data */
     int32_t sampleRate;          /* Sample rate of the stream */
     int32_t numChannels;         /* Number of audio channels */
     PCMFormat format;            /* PCM format of the reference stream */

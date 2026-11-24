@@ -548,6 +548,13 @@ void AudioDecoderTest::setupAudioDecoder()
         mInputFrame.clear();
     }
 
+    if (mTestConfiguration.csdFormat.has_value() && !mTestConfiguration.codecSpecificData.empty())
+    {
+        AUDIODECODER_PARSE_CSD_SUCCESS(mAudioDecoderController,
+                                       mTestConfiguration.csdFormat.value(),
+                                       mTestConfiguration.codecSpecificData);
+    }
+
     mOperationMode = OperationalMode::NON_TUNNELLED;
     AUDIODECODER_GET_OPERATIONALMODE_SUCCESS(mDecoderHandle, mOperationMode);
 

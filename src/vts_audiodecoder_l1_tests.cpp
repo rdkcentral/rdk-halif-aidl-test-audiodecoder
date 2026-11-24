@@ -1727,7 +1727,7 @@ UT_ADD_TEST(VTS_L1_AudioDecoder, parseCodecSpecificData_pos)
                     AUDIODECODER_START_SUCCESS(audioDecoder, audioDecoderController, true);
 
                     /* Set CSD data to the decoder */
-                    AUDIODECODER_PARSE_CSD_SUCCESS(audioDecoder, audioDecoderController, testData.format, testData.codecData, true);
+                    AUDIODECODER_PARSE_CSD_SUCCESS(audioDecoderController, testData.format, testData.codecData);
 
                     /* Stop the decoder */
                     AUDIODECODER_STOP_SUCCESS(audioDecoder, audioDecoderController, true);

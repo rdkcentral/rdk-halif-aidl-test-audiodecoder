@@ -318,7 +318,7 @@ Status AudioDecoderEventListener::onDecodeError(audiodecoder::ErrorCode errorCod
     ErrorDetails_t errorDetails;
     errorDetails.receiveTime = chrono::steady_clock::now();
 
-    UT_LOG_INFO("[Audio DecoderID: %d] Error Callback: Error Code: %s, Vendor Error Code: %d", mDecoderID, audiodecoder::toString(errorCode).c_str(), vendorErrorCode);
+    UT_LOG_INFO("[Audio DecoderID: %d] onDecodeError: Error Code: %s, Vendor Error Code: %d", mDecoderID, audiodecoder::toString(errorCode).c_str(), vendorErrorCode);
 
     errorDetails.errorCode = vendorErrorCode;
     errorDetails.vendorErrorCode = errorCode;
@@ -340,7 +340,7 @@ Status AudioDecoderEventListener::onDecodeError(audiodecoder::ErrorCode errorCod
  */
 Status AudioDecoderEventListener::onStateChanged(AudioDecoderState oldState,AudioDecoderState newState)
 {
-    UT_LOG_INFO("[Audio DecoderID: %d] State Change received: %s -> %s", mDecoderID, audiodecoder::toString(oldState).c_str(), audiodecoder::toString(newState).c_str());
+    UT_LOG_INFO("[Audio DecoderID: %d] onStateChanged received: %s -> %s", mDecoderID, audiodecoder::toString(oldState).c_str(), audiodecoder::toString(newState).c_str());
 
     {
         lock_guard<mutex> lock(mMutex);

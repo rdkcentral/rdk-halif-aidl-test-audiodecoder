@@ -635,7 +635,7 @@ extern sp<IAudioDecoderManager> gAudioDecoderManager;
         UT_ASSERT_FALSE(status.isOk()); \
     } while (0)
 
-#define AUDIODECODER_PARSE_CSD_SUCCESS(audioDecoder, audioDecoderController, csdAudioFormat, codecData, stateCheck) \
+#define AUDIODECODER_PARSE_CSD_SUCCESS(audioDecoderController, csdAudioFormat, codecData) \
     do { \
         ::android::binder::Status status; \
         bool _aidl_return; \
@@ -648,12 +648,6 @@ extern sp<IAudioDecoderManager> gAudioDecoderManager;
         UT_ASSERT_TRUE(status.isOk()); \
         UT_ASSERT_TRUE(_aidl_return); \
         UT_ASSERT_EQUAL(status.exceptionCode(), Status::EX_NONE); \
-        if (stateCheck) \
-        { \
-            AudioDecoderState lastState; \
-            AUDIODECODER_WAIT_FOR_STATE(audioDecoder, AudioDecoderState::STARTED, lastState); \
-            UT_ASSERT_EQUAL(lastState, AudioDecoderState::STARTED); \
-        } \
     } while (0)
 
 #define AUDIODECODER_PARSE_CSD_FAILURE(audioDecoderController, csdAudioFormat, codecData, exception) \

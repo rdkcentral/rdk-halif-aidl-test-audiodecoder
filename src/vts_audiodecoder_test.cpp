@@ -460,7 +460,9 @@ void AudioDecoderTest::validatePostLoopMetrics(const FrameValidationState& state
     if (metricsFrameDecoded != -1)
     {
         //TODO: in future if stop resets the metrics stoppts, eosPts should be validated accordingly
-        if ((mTestConfiguration.flushPts == -1) && (mTestConfiguration.flushRestPts == -1))
+        if ((mTestConfiguration.flushPts == -1) &&
+            (mTestConfiguration.flushRestPts == -1) &&
+            (mTestConfiguration.stopPts == -1))
         {
             UT_ASSERT_EQUAL(metricsFrameDecoded, metricsExpectedDecoded);
         }
@@ -679,6 +681,16 @@ void AudioDecoderTest::validateDecodedFrame()
 
         /* Reset retry count for the next frame */
         retryCount = 0;
+
+        /* if only metadata is available and no valid frame, handle it separately */
+        if (decodedFrame.framePTS == -1 && decodedFrame.frameBufferHandle == -1)
+        {
+            if (decodedFrame.isMetaAvailable)
+            {
+                checkFrameMetadata(decodedFrame, state);
+            }
+            continue;
+        }
 
         /* check frame decode latency for the current decoded frame */
         frameDecodeLatencyCheck(decodedFrame);

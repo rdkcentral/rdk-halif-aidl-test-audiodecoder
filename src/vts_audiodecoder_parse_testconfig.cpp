@@ -66,6 +66,24 @@
 #include "vts_audiodecoder_parse_testconfig.h"
 #include "vts_audiodecoder_helper_functions.h"
 
+namespace
+{
+std::optional<audiodecoder::CSDAudioFormat> parseCsdFormat(const string& format)
+{
+    if (format == "MP4_AUDIO_SPECIFIC_CONFIG")
+        return audiodecoder::CSDAudioFormat::MP4_AUDIO_SPECIFIC_CONFIG;
+    if (format == "ALS_SPECIFIC_CONFIG")
+        return audiodecoder::CSDAudioFormat::ALS_SPECIFIC_CONFIG;
+    if (format == "ALAC_SPECIFIC_CONFIG")
+        return audiodecoder::CSDAudioFormat::ALAC_SPECIFIC_CONFIG;
+    if (format == "EAC3_SPECIFIC_CONFIG")
+        return audiodecoder::CSDAudioFormat::EAC3_SPECIFIC_CONFIG;
+    if (format == "AC4_SPECIFIC_CONFIG")
+        return audiodecoder::CSDAudioFormat::AC4_SPECIFIC_CONFIG;
+    return std::nullopt;
+}
+}
+
 UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *module, const char *testGroup, const char *testName, vector<testConfiguration_t>& testConfiguration)
 {
     ut_kvp_status_t status;
@@ -80,9 +98,11 @@ UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *m
     const string controlList = testList + "." + "Controls";
     const string streamList = testList + "." + "Inputs" + "." + string("Streams");
     const string streamsDetails = string("AudioStreams");
+    const string inputStreamPath = string(module) + "." + "input_streams_path";
+    const string inputReferencePath = string(module) + "." + "reference_streams_path";
 
-    status = ut_kvp_getStringField(kvpTestInstance, STREAM_INPUT_PATH, streamInputPath, UT_KVP_MAX_ELEMENT_SIZE);
-    status = ut_kvp_getStringField(kvpTestInstance, STREAM_REF_PATH, streamRefPath, UT_KVP_MAX_ELEMENT_SIZE);
+    status = ut_kvp_getStringField(kvpTestInstance, inputStreamPath.c_str(), streamInputPath, UT_KVP_MAX_ELEMENT_SIZE);
+    status = ut_kvp_getStringField(kvpTestInstance, inputReferencePath.c_str(), streamRefPath, UT_KVP_MAX_ELEMENT_SIZE);
 
     streamCount = ut_kvp_getListCount(kvpTestInstance, streamList.c_str());
 
@@ -94,10 +114,13 @@ UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *m
 
         string streamName = streamList + "." + to_string(i) + "Name";
         ut_kvp_getStringField(kvpTestInstance, streamName.c_str(), resultKVP, UT_KVP_MAX_ELEMENT_SIZE);
+        testDetails.name = resultKVP;
 
         string input       = streamsDetails + "." + string(resultKVP) + "." +"input";
         string reference   = streamsDetails + "." + string(resultKVP) + "." +"reference";
         string codec       = streamsDetails + "." + string(resultKVP) + "." +"codec";
+        string codecSpecificData = streamsDetails + "." + string(resultKVP) + "." + "codec_specific_data";
+        string csdFormat   = streamList + "." + to_string(i) + "." + "csd_format";
         string sampleRate  = streamsDetails + "." + string(resultKVP) + "." +"sample_rate";
         string channels    = streamsDetails + "." + string(resultKVP) + "." +"channels";
         string format      = streamsDetails + "." + string(resultKVP) + "." +"format";
@@ -107,6 +130,8 @@ UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *m
         string framePTS    = streamList + "." + to_string(i) + "." +"PTS";
         string rmsDiff     = streamList + "." + to_string(i) + "." +"rms_diff_threshold";
         string decodeTime  = streamList + "." + to_string(i) + "." +"decode_time_threshold";
+        string trimPts      = streamList + "." + to_string(i) + "." +"trim_pts";
+        string trimRemoved  = streamList + "." + to_string(i) + "." +"trim_removed";
         string trimStart   = streamList + "." + to_string(i) + "." +"trim.0";
         string trimEnd     = streamList + "." + to_string(i) + "." +"trim.1";
         string decoderDelay         = controlList + "." + "delay_between_decode_calls";
@@ -119,6 +144,7 @@ UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *m
         string sinkFlushPts         = controlList + "." + "sink_flush_pts";
         string numFramesOverrideKey = controlList + "." + "num_frames_override";
         string streamDuration       = streamsDetails + "." + string(resultKVP) + "." + "duration";
+        string sinkBackpressure     = controlList + "." + "sink_backpressure";
 
         ut_kvp_getStringField(kvpTestInstance, input.c_str(), resultKVP, UT_KVP_MAX_ELEMENT_SIZE);
         fullPath = currentPath;
@@ -134,6 +160,34 @@ UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *m
 
         ut_kvp_getStringField(kvpTestInstance, codec.c_str(), resultKVP, UT_KVP_MAX_ELEMENT_SIZE);
         testDetails.codec = vts_audioDecoder_helper_StringToCodec(string(resultKVP));
+
+        if (ut_kvp_fieldPresent(kvpTestInstance, csdFormat.c_str()))
+        {
+            char csdFormatValue[UT_KVP_MAX_ELEMENT_SIZE] = {0};
+            ut_kvp_getStringField(kvpTestInstance, csdFormat.c_str(), csdFormatValue, UT_KVP_MAX_ELEMENT_SIZE);
+            testDetails.csdFormat = parseCsdFormat(csdFormatValue);
+            if (!testDetails.csdFormat.has_value())
+            {
+                UT_LOG_ERROR("Unsupported CSD format '%s' for stream %s", csdFormatValue, testDetails.name.c_str());
+                return UT_STATUS_FAILURE;
+            }
+        }
+
+        if (ut_kvp_fieldPresent(kvpTestInstance, codecSpecificData.c_str()))
+        {
+            const int32_t codecSpecificDataCount = ut_kvp_getListCount(kvpTestInstance, codecSpecificData.c_str());
+            for (int32_t j = 0; j < codecSpecificDataCount; ++j)
+            {
+                const string bytePath = codecSpecificData + "." + to_string(j);
+                const uint32_t byteValue = ut_kvp_getUInt32Field(kvpTestInstance, bytePath.c_str());
+                if (byteValue > 0xFF)
+                {
+                    UT_LOG_ERROR("CSD byte value %u is out of range for stream %s", byteValue, testDetails.name.c_str());
+                    return UT_STATUS_FAILURE;
+                }
+                testDetails.codecSpecificData.push_back(static_cast<uint8_t>(byteValue));
+            }
+        }
 
         testDetails.sampleRate = ut_kvp_getUInt32Field(kvpTestInstance, sampleRate.c_str());
         testDetails.numChannels = ut_kvp_getUInt32Field(kvpTestInstance, channels.c_str());
@@ -188,8 +242,15 @@ UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *m
 
         testDetails.rms_diff_threashold = ut_kvp_getDoubleField(kvpTestInstance, rmsDiff.c_str());
         testDetails.decodeTime = ut_kvp_getDoubleField(kvpTestInstance, decodeTime.c_str());
-        testDetails.trimStartNs  = ut_kvp_getUInt64Field(kvpTestInstance, trimStart.c_str());
-        testDetails.trimEndNs    = ut_kvp_getUInt64Field(kvpTestInstance, trimEnd.c_str());
+        testDetails.trimPts = -1;
+        testDetails.trimStartNs = testDetails.trimEndNs = 0;
+        if(ut_kvp_fieldPresent(kvpTestInstance, trimPts.c_str()))
+        {
+            testDetails.trimPts = ut_kvp_getUInt64Field(kvpTestInstance, trimPts.c_str());
+            testDetails.trimRemoved = ut_kvp_getUInt64Field(kvpTestInstance, trimRemoved.c_str());
+            testDetails.trimStartNs  = ut_kvp_getUInt64Field(kvpTestInstance, trimStart.c_str());
+            testDetails.trimEndNs    = ut_kvp_getUInt64Field(kvpTestInstance, trimEnd.c_str());
+        }
         testDetails.decoderDelay = ut_kvp_getUInt32Field(kvpTestInstance, decoderDelay.c_str());
         testDetails.stopPts      = ut_kvp_getUInt64Field(kvpTestInstance, stopPts.c_str());
         testDetails.discontinuityPts = ut_kvp_getUInt64Field(kvpTestInstance, discontinuityPts.c_str());
@@ -198,6 +259,11 @@ UT_status_t vts_audiodecoder_parse_testconfig(void* pTestInstance, const char *m
         testDetails.eosPts       = ut_kvp_getUInt64Field(kvpTestInstance, eosPts.c_str());
         testDetails.sinkEosPts          = ut_kvp_getUInt64Field(kvpTestInstance, sinkEosPts.c_str());
         testDetails.sinkFlushPts        = ut_kvp_getUInt64Field(kvpTestInstance, sinkFlushPts.c_str());
+        testDetails.isSinkBackpressure = false; // Default value before checking the test configuration
+        if(ut_kvp_fieldPresent(kvpTestInstance, sinkBackpressure.c_str()))
+        {
+            testDetails.isSinkBackpressure = ut_kvp_getBoolField(kvpTestInstance, sinkBackpressure.c_str());
+        }
 
         testConfiguration.push_back(testDetails);
     }

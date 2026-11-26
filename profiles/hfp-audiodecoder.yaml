@@ -25,18 +25,24 @@
 audiodecoder:           # Component object begins
     interfaceVersion: current
     IAudioDecoder:              # Resource list
-      - 0:                   # Resource object begins
-         supportedCodecs:
+      - 0:                      # Resource object begins
+         supportedCodecs:       # Array of codec capabilities
            - AAC_LC
            - DOLBY_AC3
+           - DOLBY_AC3_PLUS
+           - OPUS
          supportsSecure: false
-      - 1:
-         supportedCodecs:
+      - 1:                      # Resource object begins
+         supportedCodecs:       # Array of codec capabilities
            - AAC_LC
            - DOLBY_AC3
+           - DOLBY_AC3_PLUS
+           - OPUS
          supportsSecure: false
-      - 2:
-         supportedCodecs:
+      - 2:                      # Resource object begins
+         supportedCodecs:       # Array of codec capabilities
            - AAC_LC
            - DOLBY_AC3
+           - DOLBY_AC3_PLUS
+           - OPUS
          supportsSecure: false

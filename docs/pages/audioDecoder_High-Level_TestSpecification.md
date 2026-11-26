@@ -135,64 +135,42 @@ The following table outlines the core features validated in the L3 test phase
 
 ### Test Cases
 
-The table below summarizes the L3 test cases executed using various audio stream formats and configurations. These tests are also executed in a multi-process environment:
+The table below summarizes the L3 test cases executed using various audio stream formats and configurations. Each test runs against every decoder that supports the stream codec (and secure decode where applicable); tests are skipped if no decoder qualifies. Tunnel mode is not covered by the current implementation. These tests are also executed in a multi-process environment:
 
-|#|Test|Tunnel|Secure|Error streams|Trim|Discontinuity|EOS|Flush|Flush+Rest|Concurrency|
-|-|----|------|------|-------------|----|-------------|---|-----|----------|-----------|
-|1|ADecode_Sequential_NonTunnel_NonSecure|✘|✘|✘|✘|✘|✘|✘|✘|✘|
-|2|ADecode_Sequential_NonTunnel_NonSecure_Error|✘|✘|✔|✘|✘|✘|✘|✘|✘|
-|3|ADecode_Sequential_NonTunnel_NonSecure_Trim|✘|✘|✘|✔|✘|✘|✘|✘|✘|
-|4|ADecode_Sequential_NonTunnel_NonSecure_Discontinuity|✘|✘|✘|✘|✔|✘|✘|✘|✘|
-|5|ADecode_Sequential_NonTunnel_NonSecure_EOS|✘|✘|✘|✘|✘|✔|✘|✘|✘|
-|6|ADecode_Sequential_NonTunnel_NonSecure_Flush|✘|✘|✘|✘|✘|✘|✔|✘|✘|
-|7|ADecode_Sequential_NonTunnel_NonSecure_FlushReset|✘|✘|✘|✘|✘|✘|✘|✔|✘|
-|8|ADecode_Sequential_NonTunnel_Secure|✘|✔|✘|✘|✘|✘|✘|✘|✘|
-|9|ADecode_Sequential_NonTunnel_Secure_Error|✘|✔|✔|✘|✘|✘|✘|✘|✘|
-|10|ADecode_Sequential_NonTunnel_Secure_Trim|✘|✔|✘|✔|✘|✘|✘|✘|✘|
-|11|ADecode_Sequential_NonTunnel_Secure_Discontinuity|✘|✔|✘|✘|✔|✘|✘|✘|✘|
-|12|ADecode_Sequential_NonTunnel_Secure_EOS|✘|✔|✘|✘|✘|✔|✘|✘|✘|
-|13|ADecode_Sequential_NonTunnel_Secure_Flush|✘|✔|✘|✘|✘|✘|✔|✘|✘|
-|14|ADecode_Sequential_NonTunnel_Secure_FlushReset|✘|✔|✘|✘|✘|✘|✘|✔|✘|
-|15|ADecode_Sequential_Tunnel_NonSecure|✔|✘|✘|✘|✘|✘|✘|✘|✘|
-|16|ADecode_Sequential_Tunnel_NonSecure_Error|✔|✘|✔|✘|✘|✘|✘|✘|✘|
-|17|ADecode_Sequential_Tunnel_NonSecure_Trim|✔|✘|✘|✔|✘|✘|✘|✘|✘|
-|18|ADecode_Sequential_Tunnel_NonSecure_Discontinuity|✔|✘|✘|✘|✔|✘|✘|✘|✘|
-|19|ADecode_Sequential_Tunnel_NonSecure_EOS|✔|✘|✘|✘|✘|✔|✘|✘|✘|
-|20|ADecode_Sequential_Tunnel_NonSecure_Flush|✔|✘|✘|✘|✘|✘|✔|✘|✘|
-|21|ADecode_Sequential_Tunnel_NonSecure_FlushReset|✔|✘|✘|✘|✘|✘|✘|✔|✘|
-|22|ADecode_Sequential_Tunnel_Secure|✔|✔|✘|✘|✘|✘|✘|✘|✘|
-|23|ADecode_Sequential_Tunnel_Secure_Error|✔|✔|✔|✘|✘|✘|✘|✘|✘|
-|24|ADecode_Sequential_Tunnel_Secure_Trim|✔|✔|✘|✔|✘|✘|✘|✘|✘|
-|25|ADecode_Sequential_Tunnel_Secure_Discontinuity|✔|✔|✘|✘|✔|✘|✘|✘|✘|
-|26|ADecode_Sequential_Tunnel_Secure_EOS|✔|✔|✘|✘|✘|✔|✘|✘|✘|
-|27|ADecode_Sequential_Tunnel_Secure_Flush|✔|✔|✘|✘|✘|✘|✔|✘|✘|
-|28|ADecode_Sequential_Tunnel_Secure_FlushReset|✔|✔|✘|✘|✘|✘|✘|✔|✘|
-|29|ADecode_Concurrent_NonTunnel_NonSecure|✘|✘|✘|✘|✘|✘|✘|✘|✔|
-|30|ADecode_Concurrent_NonTunnel_NonSecure_Error|✘|✘|✔|✘|✘|✘|✘|✘|✔|
-|31|ADecode_Concurrent_NonTunnel_NonSecure_Trim|✘|✘|✘|✔|✘|✘|✘|✘|✔|
-|32|ADecode_Concurrent_NonTunnel_NonSecure_Discontinuity|✘|✘|✘|✘|✔|✘|✘|✘|✔|
-|33|ADecode_Concurrent_NonTunnel_NonSecure_EOS|✘|✘|✘|✘|✘|✔|✘|✘|✔|
-|34|ADecode_Concurrent_NonTunnel_NonSecure_Flush|✘|✘|✘|✘|✘|✘|✔|✘|✔|
-|35|ADecode_Concurrent_NonTunnel_NonSecure_FlushReset|✘|✘|✘|✘|✘|✘|✘|✔|✔|
-|36|ADecode_Concurrent_NonTunnel_Secure|✘|✔|✘|✘|✘|✘|✘|✘|✔|
-|37|ADecode_Concurrent_NonTunnel_Secure_Error|✘|✔|✔|✘|✘|✘|✘|✘|✔|
-|38|ADecode_Concurrent_NonTunnel_Secure_Trim|✘|✔|✘|✔|✘|✘|✘|✘|✔|
-|39|ADecode_Concurrent_NonTunnel_Secure_Discontinuity|✘|✔|✘|✘|✔|✘|✘|✘|✔|
-|40|ADecode_Concurrent_NonTunnel_Secure_EOS|✘|✔|✘|✘|✘|✔|✘|✘|✔|
-|41|ADecode_Concurrent_NonTunnel_Secure_Flush|✘|✔|✘|✘|✘|✘|✔|✘|✔|
-|42|ADecode_Concurrent_NonTunnel_Secure_FlushReset|✘|✔|✘|✘|✘|✘|✘|✔|✔|
-|43|ADecode_Concurrent_Tunnel_NonSecure|✔|✘|✘|✘|✘|✘|✘|✘|✔|
-|44|ADecode_Concurrent_Tunnel_NonSecure_Error|✔|✘|✔|✘|✘|✘|✘|✘|✔|
-|45|ADecode_Concurrent_Tunnel_NonSecure_Trim|✔|✘|✘|✔|✘|✘|✘|✘|✔|
-|46|ADecode_Concurrent_Tunnel_NonSecure_Discontinuity|✔|✘|✘|✘|✔|✘|✘|✘|✔|
-|47|ADecode_Concurrent_Tunnel_NonSecure_EOS|✔|✘|✘|✘|✘|✔|✘|✘|✔|
-|48|ADecode_Concurrent_Tunnel_NonSecure_Flush|✔|✘|✘|✘|✘|✘|✔|✘|✔|
-|49|ADecode_Concurrent_Tunnel_NonSecure_FlushReset|✔|✘|✘|✘|✘|✘|✘|✔|✔|
-|50|ADecode_Concurrent_Tunnel_Secure|✔|✔|✘|✘|✘|✘|✘|✘|✔|
-|51|ADecode_Concurrent_Tunnel_Secure_Error|✔|✔|✔|✘|✘|✘|✘|✘|✔|
-|52|ADecode_Concurrent_Tunnel_Secure_Trim|✔|✔|✘|✔|✘|✘|✘|✘|✔|
-|53|ADecode_Concurrent_Tunnel_Secure_Discontinuity|✔|✔|✘|✘|✔|✘|✘|✘|✔|
-|54|ADecode_Concurrent_Tunnel_Secure_EOS|✔|✔|✘|✘|✘|✔|✘|✘|✔|
-|55|ADecode_Concurrent_Tunnel_Secure_Flush|✔|✔|✘|✘|✘|✘|✔|✘|✔|
-|56|ADecode_Concurrent_Tunnel_Secure_FlushReset|✔|✔|✘|✘|✘|✘|✘|✔|✔|
+|#|Test|Secure|Error streams|Trim|Discontinuity|EOS|Flush|Flush+Reset|Stop+Start|Concurrency|
+|-|----|------|-------------|----|-------------|---|-----|-----------|----------|-----------|
+|1|ADecode_Sequential_NonSecure|✘|✘|✘|✘|✘|✘|✘|✘|✘|
+|2|ADecode_Sequential_NonSecure_Error|✘|✔|✘|✘|✘|✘|✘|✘|✘|
+|3|ADecode_Sequential_NonSecure_Trim|✘|✘|✔|✘|✘|✘|✘|✘|✘|
+|4|ADecode_Sequential_NonSecure_Discontinuity|✘|✘|✘|✔|✘|✘|✘|✘|✘|
+|5|ADecode_Sequential_NonSecure_EOS|✘|✘|✘|✘|✔|✘|✘|✘|✘|
+|6|ADecode_Sequential_NonSecure_Flush|✘|✘|✘|✘|✘|✔|✘|✘|✘|
+|7|ADecode_Sequential_NonSecure_FlushReset|✘|✘|✘|✘|✘|✘|✔|✘|✘|
+|8|ADecode_Sequential_NonSecure_StopStart|✘|✘|✘|✘|✘|✘|✘|✔|✘|
+|9|ADecode_Sequential_NonSecure_OnDecodeBufAvail|✘|✘|✘|✘|✘|✘|✘|✘|✘|
+|10|ADecode_Sequential_Secure|✔|✘|✘|✘|✘|✘|✘|✘|✘|
+|11|ADecode_Sequential_Secure_Error|✔|✔|✘|✘|✘|✘|✘|✘|✘|
+|12|ADecode_Sequential_Secure_Trim|✔|✘|✔|✘|✘|✘|✘|✘|✘|
+|13|ADecode_Sequential_Secure_Discontinuity|✔|✘|✘|✔|✘|✘|✘|✘|✘|
+|14|ADecode_Sequential_Secure_EOS|✔|✘|✘|✘|✔|✘|✘|✘|✘|
+|15|ADecode_Sequential_Secure_Flush|✔|✘|✘|✘|✘|✔|✘|✘|✘|
+|16|ADecode_Sequential_Secure_FlushReset|✔|✘|✘|✘|✘|✘|✔|✘|✘|
+|17|ADecode_Sequential_Secure_StopStart|✔|✘|✘|✘|✘|✘|✘|✔|✘|
+|18|ADecode_Concurrent_NonSecure|✘|✘|✘|✘|✘|✘|✘|✘|✔|
+|19|ADecode_Concurrent_NonSecure_Error|✘|✔|✘|✘|✘|✘|✘|✘|✔|
+|20|ADecode_Concurrent_NonSecure_Trim|✘|✘|✔|✘|✘|✘|✘|✘|✔|
+|21|ADecode_Concurrent_NonSecure_Discontinuity|✘|✘|✘|✔|✘|✘|✘|✘|✔|
+|22|ADecode_Concurrent_NonSecure_EOS|✘|✘|✘|✘|✔|✘|✘|✘|✔|
+|23|ADecode_Concurrent_NonSecure_Flush|✘|✘|✘|✘|✘|✔|✘|✘|✔|
+|24|ADecode_Concurrent_NonSecure_FlushReset|✘|✘|✘|✘|✘|✘|✔|✘|✔|
+|25|ADecode_Concurrent_NonSecure_StopStart|✘|✘|✘|✘|✘|✘|✘|✔|✔|
+|26|ADecode_Concurrent_Secure|✔|✘|✘|✘|✘|✘|✘|✘|✔|
+|27|ADecode_Concurrent_Secure_Error|✔|✔|✘|✘|✘|✘|✘|✘|✔|
+|28|ADecode_Concurrent_Secure_Trim|✔|✘|✔|✘|✘|✘|✘|✘|✔|
+|29|ADecode_Concurrent_Secure_Discontinuity|✔|✘|✘|✔|✘|✘|✘|✘|✔|
+|30|ADecode_Concurrent_Secure_EOS|✔|✘|✘|✘|✔|✘|✘|✘|✔|
+|31|ADecode_Concurrent_Secure_Flush|✔|✘|✘|✘|✘|✔|✘|✘|✔|
+|32|ADecode_Concurrent_Secure_FlushReset|✔|✘|✘|✘|✘|✘|✔|✘|✔|
+|33|ADecode_Concurrent_Secure_StopStart|✔|✘|✘|✘|✘|✘|✘|✔|✔|
 
+`ADecode_Sequential_NonSecure_OnDecodeBufAvail` stresses the HAL input queue (larger stream, no delay between decode calls) and verifies that neither `queueFullCount` nor `decodeBufferAvailCount` becomes non-zero.

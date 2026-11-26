@@ -98,13 +98,12 @@ AudioDecoderTest::AudioDecoderTest(IAudioDecoder::Id decoderId, sp<IAudioDecoder
           mAVbufferHelper(avbufferHelper),
           mIsSinkAttached(isSinkAttached)
 {
-    mBufferListener = new AVBufferSpaceListener();
-    AVBUFFER_CREATE_AUDIOPOOL_SUCCESS(mAVBufferManager, mSecureDecode, mDecoderId, mBufferListener, mAudioPool);
+    UT_LOG_INFO("AudioDecoderTest created");
 }
 
 AudioDecoderTest::~AudioDecoderTest()
 {
-    AVBUFFER_DESTROY_POOL_SUCCESS(mAVBufferManager, mAudioPool);
+    UT_LOG_INFO("AudioDecoderTest destroyed");
 }
 
 void AudioDecoderTest::getDecoderMetrics(int32_t &framesDecoded,
@@ -560,6 +559,10 @@ void AudioDecoderTest::setupAudioDecoder()
     mOperationMode = OperationalMode::NON_TUNNELLED;
     AUDIODECODER_GET_OPERATIONALMODE_SUCCESS(mDecoderHandle, mOperationMode);
 
+    /* Create audio buffer pool */
+    mBufferListener = new AVBufferSpaceListener();
+    AVBUFFER_CREATE_AUDIOPOOL_SUCCESS(mAVBufferManager, mSecureDecode, mDecoderId, mBufferListener, mAudioPool);
+
     return;
 }
 
@@ -570,6 +573,10 @@ void AudioDecoderTest::teardownDecoder()
 
     /* Close the decoder */
     AUDIODECODER_CLOSE_SUCCESS(mDecoderHandle, mAudioDecoderController, true);
+
+    /* Destroy audio buffer pool and delete buffer listener */
+    AVBUFFER_DESTROY_POOL_SUCCESS(mAVBufferManager, mAudioPool);
+    mBufferListener = nullptr;
 }
 
 void AudioDecoderTest::cleanupAudioDecoder()

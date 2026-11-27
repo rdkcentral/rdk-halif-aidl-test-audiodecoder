@@ -65,6 +65,7 @@
 #ifndef __VTS_AUDIODECODER_PARSE_TESTCONFIG_H__
 #define __VTS_AUDIODECODER_PARSE_TESTCONFIG_H__
 
+#include <optional>
 #include <ut.h>
 #include <ut_log.h>
 #include "ut_kvp_profile.h"
@@ -74,25 +75,27 @@
 #include "com/rdk/hal/audiodecoder/BnAudioDecoderEventListener.h"
 
 #define VTS_TEST_CONFIG_PATH "./audiodecoder_test_configuration/vts_l3_test_config.yaml"
-#define VTS_AUDIOSINK_TEST_CONFIG_PATH "./audiosink_test_configuration/vts_l3_test_config.yaml"
-#define STREAM_DOWNLOAD_PATH "audiodecoder.stream_download_path"
-#define STREAM_INPUT_PATH "audiodecoder.input_streams_path"
-#define STREAM_REF_PATH "audiodecoder.reference_streams_path"
 
 using namespace std;
 using namespace com::rdk::hal;
 
 typedef struct testConfiguration
 {
+    /* Stream name as listed in Inputs.Streams (key into AudioStreams) */
+    std::string name;
     std::string input;
     std::string reference;
     audiodecoder::Codec codec;
+    std::optional<audiodecoder::CSDAudioFormat> csdFormat;
+    std::vector<uint8_t> codecSpecificData;
     int32_t sampleRate;
     int32_t numChannels;
     audiodecoder::PCMFormat format;
     int32_t numOfFrames;
     double rms_diff_threashold;
     int64_t decodeTime;
+    int64_t trimPts;
+    int64_t trimRemoved;
     int64_t trimStartNs;
     int64_t trimEndNs;
     int32_t decoderDelay;
@@ -103,6 +106,7 @@ typedef struct testConfiguration
     int64_t eosPts;
     int64_t sinkEosPts;
     int64_t sinkFlushPts;
+    bool    isSinkBackpressure;
     int64_t duration;
     /* Frame size, PTS, error frame */
     std::vector<std::tuple<int32_t, int64_t, bool>> frameDetails;

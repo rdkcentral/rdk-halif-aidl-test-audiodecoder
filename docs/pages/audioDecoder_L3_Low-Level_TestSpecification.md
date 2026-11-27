@@ -50,7 +50,7 @@ IAudioDecoderManager:
   input_streams_path: "assets/streams/input"
   reference_streams_path: "assets/streams/reference/"
   L3:
-    ADecode_Sequential_NonTunnel_NonSecure:
+    Decode:
       Controls:
         delay_between_decode_calls: 5 #Time in milli seconds
         stop_start_pts: 106666667
@@ -58,6 +58,8 @@ IAudioDecoderManager:
         flush_pts: 170666667
         flush_reset_pts: 192000000
         eos_pts: 192000000
+        sink_eos_pts: -1
+        sink_flush_pts: -1
       Inputs:
         Streams:
           - Name: tones_48k_2_256_aac
@@ -107,9 +109,13 @@ IAudioDecoderManager:
 - flush_pts - `pts` value in nano seconds that determine when the test should flush the decoder. -1 indicates that test should not flush
 - flush_reset_pts - `pts` value in nano seconds that determine when the test should flush with reset the decoder. -1 indicates that test should not flush
 - eos_pts - `pts` value in nano seconds that determine when the test should sent `eos` signal to decoder. -1 indicates that test should not signal `eos`
+- sink_eos_pts / sink_flush_pts - `pts` values at which `eos` / flush is signalled to the sink. -1 disables. Only meaningful when a sink is attached (not used by the current L3 tests)
+- sink_backpressure - enables sink back-pressure handling
+- num_frames_override - limits the number of frames submitted; the stream `duration` is scaled proportionally
+- on_decode_buf_avail_test - set to 1 for the `Decode_OnDecodeBufAvail` input queue stress test
 - Name: Identifier for the stream, as defined in the stream configuration file
 - PTS: Presentation Time Stamps (per frame) in nanoseconds
-- trim: Start and end trim points in Nano seconds
+- trim: Start and end trim points in Nano seconds (parsed as `trim_pts` / `trim_removed`)
 - rms_diff_threshold: Maximum allowed `rms` difference for output validation
 - decode_time_threshold: Time budget per frame for decoding, in nanoseconds
 
@@ -261,7 +267,8 @@ sequenceDiagram
   participant DecoderTest as DecoderTest
   participant buffer as AV Buffer HAL
 
-  loop For each decoder
+  loop For each usable decoder (isDecoderUsable)
+    rundecoder->>rundecoder: resetDecodeSession()
     rundecoder->>buffer : getHeapMetrics()
     buffer -->> rundecoder: AV Buffer metrics
     rundecoder->>DecoderTest: run()
@@ -284,9 +291,10 @@ sequenceDiagram
   participant DecoderTest
   participant buffer as AV Buffer HAL
 
-  loop For each decoder
-    rundecoder->>buffer : getHeapMetrics()
-    buffer -->> rundecoder: AV Buffer metrics
+  rundecoder->>buffer : getHeapMetrics()
+  buffer -->> rundecoder: AV Buffer metrics
+  loop For each usable decoder (isDecoderUsable)
+    rundecoder->>rundecoder: resetDecodeSession()
     rundecoder->>thread_1: launch thread
     rundecoder->>thread_N: launch threads
     par thread_1
@@ -296,11 +304,11 @@ sequenceDiagram
       thread_N->>DecoderTest: run()
       thread_N->>thread_N: wait for decode <br>to complete
     end
-    rundecoder->>rundecoder: join threads
-    rundecoder->>buffer : getHeapMetrics()
-    buffer -->> rundecoder: AV Buffer metrics
-    rundecoder->>rundecoder: Validate AV buffer metrics
   end
+  rundecoder->>rundecoder: join threads
+  rundecoder->>buffer : getHeapMetrics()
+  buffer -->> rundecoder: AV Buffer metrics
+  rundecoder->>rundecoder: Validate AV buffer metrics
 ```
 
 ### DecoderTest Class
@@ -459,6 +467,8 @@ typedef struct testConfiguration
     std::string input;           /* Path to input encoded stream file */
     std::string reference;       /* Path to reference PCM stream file */
     Codec codec;                 /* Codec type (e.g., AAC, OPUS) */
+    std::optional<CSDAudioFormat> csdFormat; /* Optional codec-specific data format */
+    std::vector<uint8_t> codecSpecificData; /* Optional codec-specific initialization data */
     int32_t sampleRate;          /* Sample rate of the stream */
     int32_t numChannels;         /* Number of audio channels */
     PCMFormat format;            /* PCM format of the reference stream */
@@ -510,71 +520,70 @@ This check ensures that both the test suite and the decoder HAL properly release
 
 ## L3 Tests
 
-The L3 tests validate the functional correctness and performance of the AudioDecoder HAL by simulating real-world decoding workflows. Each test calls `runSingleProcessTest` with different parameters. `Test Configuration Controls` describes the control parameters used from test configuration file `vts_l3_test_config.yaml`
+The L3 tests validate the functional correctness and performance of the AudioDecoder HAL by simulating real-world decoding workflows. Each test is registered with `UT_ADD_TEST` in [vts_audiodecoder_l3_tests.cpp](../../src/vts_audiodecoder_l3_tests.cpp) and calls `runSingleProcessTest(testName, secureMode, concurrentMode)`:
 
-|# | Test Name                                         | function             | Arguments                                      | Test Configuration Controls                |
-|--|---------------------------------------------------|----------------------|------------------------------------------------|--------------------------------------------|
-| 1| ADecode_Sequential_NonTunnel_NonSecure             | runSingleProcessTest | secureMode = false<br>concurrentMode = false   | Inputs.Streams                             |
-| 2| ADecode_Sequential_NonTunnel_NonSecure_Error       | runSingleProcessTest | secureMode = false<br>concurrentMode = false   | Inputs.Streams                             |
-| 3| ADecode_Sequential_NonTunnel_NonSecure_Trim        | runSingleProcessTest | secureMode = false<br>concurrentMode = false   | Inputs.Streams<br>Inputs.Streams.trim      |
-| 4| ADecode_Sequential_NonTunnel_NonSecure_Discontinuity| runSingleProcessTest| secureMode = false<br>concurrentMode = false   | Inputs.Streams<br>Controls.signal_discontinuity_pts |
-| 5| ADecode_Sequential_NonTunnel_NonSecure_EOS         | runSingleProcessTest | secureMode = false<br>concurrentMode = false   | Inputs.Streams<br>Controls.eos_pts         |
-| 6| ADecode_Sequential_NonTunnel_NonSecure_Flush       | runSingleProcessTest | secureMode = false<br>concurrentMode = false   | Inputs.Streams<br>Controls.flush_pts       |
-| 7| ADecode_Sequential_NonTunnel_NonSecure_FlushReset  | runSingleProcessTest | secureMode = false<br>concurrentMode = false   | Inputs.Streams<br>Controls.flush_reset_pts |
-| 8| ADecode_Sequential_NonTunnel_NonSecure_StopStart   | runSingleProcessTest | secureMode = false<br>concurrentMode = false   | Inputs.Streams<br>Controls.stop_start_pts  |
-| 9| ADecode_Sequential_NonTunnel_Secure                | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams                             |
-|10| ADecode_Sequential_NonTunnel_Secure_Error          | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams                             |
-|11| ADecode_Sequential_NonTunnel_Secure_Trim           | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams<br>Inputs.Streams.trim      |
-|12| ADecode_Sequential_NonTunnel_Secure_Discontinuity  | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams<br>Controls.signal_discontinuity_pts |
-|13| ADecode_Sequential_NonTunnel_Secure_EOS            | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams<br>Controls.eos_pts         |
-|14| ADecode_Sequential_NonTunnel_Secure_Flush          | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams<br>Controls.flush_pts       |
-|15| ADecode_Sequential_NonTunnel_Secure_FlushReset     | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams<br>Controls.flush_reset_pts |
-|16| ADecode_Sequential_NonTunnel_Secure_StopStart      | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams<br>Controls.stop_start_pts  |
-|17| ADecode_Sequential_Tunnel_NonSecure                | runSingleProcessTest | secureMode = false<br>concurrentMode = false   | Inputs.Streams                             |
-|18| ADecode_Sequential_Tunnel_NonSecure_Error          | runSingleProcessTest | secureMode = false<br>concurrentMode = false   | Inputs.Streams                             |
-|19| ADecode_Sequential_Tunnel_NonSecure_Trim           | runSingleProcessTest | secureMode = false<br>concurrentMode = false   | Inputs.Streams<br>Inputs.Streams.trim      |
-|20| ADecode_Sequential_Tunnel_NonSecure_Discontinuity  | runSingleProcessTest | secureMode = false<br>concurrentMode = false   | Inputs.Streams<br>Controls.signal_discontinuity_pts |
-|21| ADecode_Sequential_Tunnel_NonSecure_EOS            | runSingleProcessTest | secureMode = false<br>concurrentMode = false   | Inputs.Streams<br>Controls.eos_pts         |
-|22| ADecode_Sequential_Tunnel_NonSecure_Flush          | runSingleProcessTest | secureMode = false<br>concurrentMode = false   | Inputs.Streams<br>Controls.flush_pts       |
-|23| ADecode_Sequential_Tunnel_NonSecure_FlushReset     | runSingleProcessTest | secureMode = false<br>concurrentMode = false   | Inputs.Streams<br>Controls.flush_reset_pts |
-|24| ADecode_Sequential_Tunnel_NonSecure_StopStart      | runSingleProcessTest | secureMode = false<br>concurrentMode = false   | Inputs.Streams<br>Controls.stop_start_pts  |
-|25| ADecode_Sequential_Tunnel_Secure                   | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams                             |
-|26| ADecode_Sequential_Tunnel_Secure_Error             | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams                             |
-|27| ADecode_Sequential_Tunnel_Secure_Trim              | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams<br>Inputs.Streams.trim      |
-|28| ADecode_Sequential_Tunnel_Secure_Discontinuity     | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams<br>Controls.signal_discontinuity_pts |
-|29| ADecode_Sequential_Tunnel_Secure_EOS               | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams<br>Controls.eos_pts         |
-|30| ADecode_Sequential_Tunnel_Secure_Flush             | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams<br>Controls.flush_pts       |
-|31| ADecode_Sequential_Tunnel_Secure_FlushReset        | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams<br>Controls.flush_reset_pts |
-|32| ADecode_Sequential_Tunnel_Secure_StopStart         | runSingleProcessTest | secureMode = true<br>concurrentMode = false    | Inputs.Streams<br>Controls.stop_start_pts  |
-|33| ADecode_Concurrent_NonTunnel_NonSecure             | runSingleProcessTest | secureMode = false<br>concurrentMode = true    | Inputs.Streams                             |
-|34| ADecode_Concurrent_NonTunnel_NonSecure_Error       | runSingleProcessTest | secureMode = false<br>concurrentMode = true    | Inputs.Streams                             |
-|35| ADecode_Concurrent_NonTunnel_NonSecure_Trim        | runSingleProcessTest | secureMode = false<br>concurrentMode = true    | Inputs.Streams<br>Inputs.Streams.trim      |
-|36| ADecode_Concurrent_NonTunnel_NonSecure_Discontinuity| runSingleProcessTest| secureMode = false<br>concurrentMode = true    | Inputs.Streams<br>Controls.signal_discontinuity_pts |
-|37| ADecode_Concurrent_NonTunnel_NonSecure_EOS         | runSingleProcessTest | secureMode = false<br>concurrentMode = true    | Inputs.Streams<br>Controls.eos_pts         |
-|38| ADecode_Concurrent_NonTunnel_NonSecure_Flush       | runSingleProcessTest | secureMode = false<br>concurrentMode = true    | Inputs.Streams<br>Controls.flush_pts       |
-|39| ADecode_Concurrent_NonTunnel_NonSecure_FlushReset  | runSingleProcessTest | secureMode = false<br>concurrentMode = true    | Inputs.Streams<br>Controls.flush_reset_pts |
-|40| ADecode_Concurrent_NonTunnel_NonSecure_StopStart   | runSingleProcessTest | secureMode = false<br>concurrentMode = true    | Inputs.Streams<br>Controls.stop_start_pts  |
-|41| ADecode_Concurrent_NonTunnel_Secure                | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams                             |
-|42| ADecode_Concurrent_NonTunnel_Secure_Error          | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams                             |
-|43| ADecode_Concurrent_NonTunnel_Secure_Trim           | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams<br>Inputs.Streams.trim      |
-|44| ADecode_Concurrent_NonTunnel_Secure_Discontinuity  | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams<br>Controls.signal_discontinuity_pts |
-|45| ADecode_Concurrent_NonTunnel_Secure_EOS            | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams<br>Controls.eos_pts         |
-|46| ADecode_Concurrent_NonTunnel_Secure_Flush          | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams<br>Controls.flush_pts       |
-|47| ADecode_Concurrent_NonTunnel_Secure_FlushReset     | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams<br>Controls.flush_reset_pts |
-|48| ADecode_Concurrent_NonTunnel_Secure_StopStart      | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams<br>Controls.stop_start_pts  |
-|49| ADecode_Concurrent_Tunnel_NonSecure                | runSingleProcessTest | secureMode = false<br>concurrentMode = true    | Inputs.Streams                             |
-|50| ADecode_Concurrent_Tunnel_NonSecure_Error          | runSingleProcessTest | secureMode = false<br>concurrentMode = true    | Inputs.Streams                             |
-|51| ADecode_Concurrent_Tunnel_NonSecure_Trim           | runSingleProcessTest | secureMode = false<br>concurrentMode = true    | Inputs.Streams<br>Inputs.Streams.trim      |
-|52| ADecode_Concurrent_Tunnel_NonSecure_Discontinuity  | runSingleProcessTest | secureMode = false<br>concurrentMode = true    | Inputs.Streams<br>Controls.signal_discontinuity_pts |
-|53| ADecode_Concurrent_Tunnel_NonSecure_EOS            | runSingleProcessTest | secureMode = false<br>concurrentMode = true    | Inputs.Streams<br>Controls.eos_pts         |
-|54| ADecode_Concurrent_Tunnel_NonSecure_Flush          | runSingleProcessTest | secureMode = false<br>concurrentMode = true    | Inputs.Streams<br>Controls.flush_pts       |
-|55| ADecode_Concurrent_Tunnel_NonSecure_FlushReset     | runSingleProcessTest | secureMode = false<br>concurrentMode = true    | Inputs.Streams<br>Controls.flush_reset_pts |
-|56| ADecode_Concurrent_Tunnel_NonSecure_StopStart      | runSingleProcessTest | secureMode = false<br>concurrentMode = true    | Inputs.Streams<br>Controls.stop_start_pts  |
-|57| ADecode_Concurrent_Tunnel_Secure                   | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams                             |
-|58| ADecode_Concurrent_Tunnel_Secure_Error             | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams                             |
-|59| ADecode_Concurrent_Tunnel_Secure_Trim              | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams<br>Inputs.Streams.trim      |
-|60| ADecode_Concurrent_Tunnel_Secure_Discontinuity     | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams<br>Controls.signal_discontinuity_pts |
-|61| ADecode_Concurrent_Tunnel_Secure_EOS               | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams<br>Controls.eos_pts         |
-|62| ADecode_Concurrent_Tunnel_Secure_Flush             | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams<br>Controls.flush_pts       |
-|63| ADecode_Concurrent_Tunnel_Secure_FlushReset        | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams<br>Controls.flush_reset_pts |
-|64| ADecode_Concurrent_Tunnel_Secure_StopStart         | runSingleProcessTest | secureMode = true<br>concurrentMode = true     | Inputs.Streams<br>Controls.stop_start_pts  |
+1. The test configuration entry named `testName` is parsed with `vts_audiodecoder_parse_testconfig()` into a list of `testConfiguration_t` (one per stream).
+2. For each stream, `runConcurrentDecode()` (`concurrentMode = true`) or `runSequentialDecode()` (`concurrentMode = false`) is called.
+3. Decoders that are not in the HFP profile (`gAudiodecoders_hfp`), do not support the stream codec, or (secure mode) do not report `supportsSecure` are skipped by `isDecoderUsable()`.
+4. If no decoder executed any stream, the test is skipped with `GTEST_SKIP()` ("No valid test configuration executed").
+
+`decoderTest.run()` is always executed with metrics validation enabled and without a sink attached (`isSinkAttached = false`). Tunnel mode is not exercised by the current implementation.
+
+The `Test Configuration Controls` column lists the control parameters used from the test configuration. The `Config entry` column is the `testName` passed to `runSingleProcessTest`, which maps to the YAML file in [audiodecoder_test_configuration](../../audiodecoder_test_configuration/).
+
+Test case IDs are assigned within Test Group 003.
+
+### Sequential, Non-Secure (`secureMode = false`, `concurrentMode = false`)
+
+|# | Test Name                                       | Config entry              | Test Configuration Controls                          |
+|--|-------------------------------------------------|---------------------------|------------------------------------------------------|
+| 1| ADecode_Sequential_NonSecure                    | Decode                    | Inputs.Streams                                       |
+| 2| ADecode_Sequential_NonSecure_Error              | Decode_Error              | Inputs.Streams (error_frames)                        |
+| 3| ADecode_Sequential_NonSecure_Trim               | Decode_Trim               | Inputs.Streams<br>Inputs.Streams.trim_pts/trim_removed |
+| 4| ADecode_Sequential_NonSecure_Discontinuity      | Decode_Discontinuity      | Inputs.Streams<br>Controls.signal_discontinuity_pts  |
+| 5| ADecode_Sequential_NonSecure_EOS                | Decode_EOS                | Inputs.Streams<br>Controls.eos_pts                   |
+| 6| ADecode_Sequential_NonSecure_Flush              | Decode_Flush              | Inputs.Streams<br>Controls.flush_pts                 |
+| 7| ADecode_Sequential_NonSecure_FlushReset         | Decode_FlushReset         | Inputs.Streams<br>Controls.flush_reset_pts           |
+| 8| ADecode_Sequential_NonSecure_StopStart          | Decode_Stop_Start         | Inputs.Streams<br>Controls.stop_start_pts            |
+| 9| ADecode_Sequential_NonSecure_OnDecodeBufAvail   | Decode_OnDecodeBufAvail   | Inputs.Streams<br>Controls.num_frames_override<br>Controls.on_decode_buf_avail_test<br>Controls.delay_between_decode_calls = 0 |
+
+`ADecode_Sequential_NonSecure_OnDecodeBufAvail` submits a larger stream with no delay between `decodeBufferWithMetadata()` calls to stress the HAL input pipeline. The HAL must accept every frame: both `decodeBufferWithMetadata()` returning false (`queueFullCount`) and `onDecodeBufferAvailable` firing (`decodeBufferAvailCount`) must stay at zero. This input queue check also runs in all other decode tests.
+
+### Sequential, Secure (`secureMode = true`, `concurrentMode = false`)
+
+|# | Test Name                                       | Config entry              | Test Configuration Controls                          |
+|--|-------------------------------------------------|---------------------------|------------------------------------------------------|
+|10| ADecode_Sequential_Secure                       | Decode                    | Inputs.Streams                                       |
+|11| ADecode_Sequential_Secure_Error                 | Decode_Error              | Inputs.Streams (error_frames)                        |
+|12| ADecode_Sequential_Secure_Trim                  | Decode_Trim               | Inputs.Streams<br>Inputs.Streams.trim_pts/trim_removed |
+|13| ADecode_Sequential_Secure_Discontinuity         | Decode_Discontinuity      | Inputs.Streams<br>Controls.signal_discontinuity_pts  |
+|14| ADecode_Sequential_Secure_EOS                   | Decode_EOS                | Inputs.Streams<br>Controls.eos_pts                   |
+|15| ADecode_Sequential_Secure_Flush                 | Decode_Flush              | Inputs.Streams<br>Controls.flush_pts                 |
+|16| ADecode_Sequential_Secure_FlushReset            | Decode_FlushReset         | Inputs.Streams<br>Controls.flush_reset_pts           |
+|17| ADecode_Sequential_Secure_StopStart             | Decode_Stop_Start         | Inputs.Streams<br>Controls.stop_start_pts            |
+
+### Concurrent, Non-Secure (`secureMode = false`, `concurrentMode = true`)
+
+|# | Test Name                                       | Config entry              | Test Configuration Controls                          |
+|--|-------------------------------------------------|---------------------------|------------------------------------------------------|
+|18| ADecode_Concurrent_NonSecure                    | Decode                    | Inputs.Streams                                       |
+|19| ADecode_Concurrent_NonSecure_Error              | Decode_Error              | Inputs.Streams (error_frames)                        |
+|20| ADecode_Concurrent_NonSecure_Trim               | Decode_Trim               | Inputs.Streams<br>Inputs.Streams.trim_pts/trim_removed |
+|21| ADecode_Concurrent_NonSecure_Discontinuity      | Decode_Discontinuity      | Inputs.Streams<br>Controls.signal_discontinuity_pts  |
+|22| ADecode_Concurrent_NonSecure_EOS                | Decode_EOS                | Inputs.Streams<br>Controls.eos_pts                   |
+|23| ADecode_Concurrent_NonSecure_Flush              | Decode_Flush              | Inputs.Streams<br>Controls.flush_pts                 |
+|24| ADecode_Concurrent_NonSecure_FlushReset         | Decode_FlushReset         | Inputs.Streams<br>Controls.flush_reset_pts           |
+|25| ADecode_Concurrent_NonSecure_StopStart          | Decode_Stop_Start         | Inputs.Streams<br>Controls.stop_start_pts            |
+
+### Concurrent, Secure (`secureMode = true`, `concurrentMode = true`)
+
+|# | Test Name                                       | Config entry              | Test Configuration Controls                          |
+|--|-------------------------------------------------|---------------------------|------------------------------------------------------|
+|26| ADecode_Concurrent_Secure                       | Decode_Secure             | Inputs.Streams                                       |
+|27| ADecode_Concurrent_Secure_Error                 | Decode_Error              | Inputs.Streams (error_frames)                        |
+|28| ADecode_Concurrent_Secure_Trim                  | Decode_Trim               | Inputs.Streams<br>Inputs.Streams.trim_pts/trim_removed |
+|29| ADecode_Concurrent_Secure_Discontinuity         | Decode_Discontinuity      | Inputs.Streams<br>Controls.signal_discontinuity_pts  |
+|30| ADecode_Concurrent_Secure_EOS                   | Decode_EOS                | Inputs.Streams<br>Controls.eos_pts                   |
+|31| ADecode_Concurrent_Secure_Flush                 | Decode_Flush              | Inputs.Streams<br>Controls.flush_pts                 |
+|32| ADecode_Concurrent_Secure_FlushReset            | Decode_FlushReset         | Inputs.Streams<br>Controls.flush_reset_pts           |
+|33| ADecode_Concurrent_Secure_StopStart             | Decode_Stop_Start         | Inputs.Streams<br>Controls.stop_start_pts            |

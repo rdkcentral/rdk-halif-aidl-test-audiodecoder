@@ -27,7 +27,7 @@ audiodecoder:
   L3:
     Decode_FlushReset:
       Controls:
-        delay_between_decode_calls: 5
+        delay_between_decode_calls: 1
         stop_start_pts: -1
         signal_discontinuity_pts: -1
         flush_pts: -1
